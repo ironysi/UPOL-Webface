@@ -6,6 +6,8 @@ using System.Web.Mvc;
 
 using Emgu.CV;
 using Emgu.CV.Structure;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace WebFace.Controllers
 {
@@ -55,42 +57,17 @@ namespace WebFace.Controllers
             return RedirectToAction("Index");
         }
 
-        public ActionResult Pokus()
-        {
-
-            var ret = Convert("skoupil.jpg");
-
-            return Json(ret, JsonRequestBehavior.AllowGet);
-
-        }
-
-        public ActionResult Skupina()
-        {
-
-            var ret = Convert("skupina.jpg");
-
-            return Json(ret, JsonRequestBehavior.AllowGet);
-
-        }
-
-        public ActionResult None()
-        {
-
-            var ret = Convert("dom.jpg");
-
-            return Json(ret, JsonRequestBehavior.AllowGet);
-
-        }
-
-
         private Rectangle[] Convert(string name)
         {
             var bmp = (Bitmap) Image.FromFile(Server.MapPath("~/App_Data/uploads/" + name));
 
-            var ret = Analyze(bmp);
+            saveImgProperties(bmp, name);
 
+            var img2 = new Bitmap(bmp, new Size(250, 300));
 
-            var img2 = new Bitmap(bmp);
+            var ret = Analyze(img2);
+          
+            
 
             Graphics g = Graphics.FromImage(img2);
             foreach (var rectangle in ret)
@@ -142,6 +119,21 @@ namespace WebFace.Controllers
             }
 
             return new Rectangle[0];
+        }
+
+        private void saveImgProperties(Bitmap bitmap, string fileName)
+        {
+            JObject imgProperties = new JObject(
+                new JProperty("imgSize", bitmap.Size.ToString()));
+
+            string json = JsonConvert.SerializeObject(imgProperties, Formatting.Indented);
+
+            System.IO.File.WriteAllText(Server.MapPath("~/App_Data/uploads/properties_" + fileName + ".json"), json);
+        }
+
+        private void CleanFolder(string folderName)
+        {
+
         }
     }
 }
