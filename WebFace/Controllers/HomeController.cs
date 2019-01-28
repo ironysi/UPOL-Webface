@@ -32,6 +32,29 @@ namespace WebFace.Controllers
             return View();
         }
 
+        public ActionResult CleanFolder()
+        {
+            string folderName = "~/App_Data";
+
+            DirectoryInfo d = new DirectoryInfo(Server.MapPath("~/App_Data/"));
+            FileInfo[] files = d.GetFiles("*.jpg");
+
+
+            foreach (var file in files)
+            {
+                // extract only the filename
+                var fileName = Path.GetFileName(file.Name);
+                // store the file inside ~/App_Data/uploads folder
+
+                var filePath = Path.Combine(Server.MapPath("~/App_Data/uploads"), fileName ?? throw new InvalidOperationException());
+
+                file.CopyTo(filePath, overwrite:true);
+
+                EvaluateAndSaveImg(filePath, fileName);
+            }
+
+            return RedirectToAction("Index");
+        }
 
         public ActionResult Upload(HttpPostedFileBase file)
         {
@@ -61,20 +84,18 @@ namespace WebFace.Controllers
         {
             var bmp = (Bitmap) Image.FromFile(Server.MapPath("~/App_Data/uploads/" + name));
 
-            saveImgProperties(bmp, name);
+            SaveImgProperties(bmp, name);
 
             var img2 = new Bitmap(bmp, new Size(250, 300));
 
             var ret = Analyze(img2);
           
-            
-
             Graphics g = Graphics.FromImage(img2);
+
             foreach (var rectangle in ret)
             {
                 g.FillRectangle(new SolidBrush(Color.FromArgb(50, 255, 0, 0)), rectangle);
             }
-
 
             g.Save();
 
@@ -93,6 +114,20 @@ namespace WebFace.Controllers
             }
 
             return ret;
+        }
+
+        private void EvaluateAndSaveImg(string fullFilePath, string fileName)
+        {
+            var bmp = (Bitmap) Image.FromFile(fullFilePath);
+
+            var img2 = new Bitmap(bmp, new Size(250, 300));
+
+            var ret = Analyze(img2);
+
+            if(ret.Length == 1)
+                img2.Save(Server.MapPath("~/App_Data/clean_data/" + fileName));
+            else
+                img2.Save(Server.MapPath("~/App_Data/dirty_data/" + fileName));
         }
 
 
@@ -121,7 +156,7 @@ namespace WebFace.Controllers
             return new Rectangle[0];
         }
 
-        private void saveImgProperties(Bitmap bitmap, string fileName)
+        private void SaveImgProperties(Bitmap bitmap, string fileName)
         {
             JObject imgProperties = new JObject(
                 new JProperty("imgSize", bitmap.Size.ToString()));
@@ -129,11 +164,6 @@ namespace WebFace.Controllers
             string json = JsonConvert.SerializeObject(imgProperties, Formatting.Indented);
 
             System.IO.File.WriteAllText(Server.MapPath("~/App_Data/uploads/properties_" + fileName + ".json"), json);
-        }
-
-        private void CleanFolder(string folderName)
-        {
-
         }
     }
 }
