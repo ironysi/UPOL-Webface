@@ -38,16 +38,17 @@ namespace WebFace.Controllers
                 // extract only the filename
                 var fileName = Path.GetFileName(file.FileName);
                 // store the file inside ~/App_Data/uploads folder
-                var path = Path.Combine(Server.MapPath("~/App_Data/uploads"),
-                    fileName ?? throw new InvalidOperationException());
+                var filePath = Path.Combine(Server.MapPath("~/App_Data/uploads"), fileName ?? throw new InvalidOperationException());
 
-                file.SaveAs(path);
+                // we do not need to save original file (at development stage)
+                file.SaveAs(filePath);
 
                 var result = Convert(fileName);
+              
             }
             else
             {
-                // print error msg
+                Console.WriteLine("Upload error!");
             }
 
             // redirect back to the index action to show the form once again
@@ -99,7 +100,21 @@ namespace WebFace.Controllers
 
 
             g.Save();
-            img2.Save(Server.MapPath("~/App_Data/uploads/x_" + name));
+
+            if (ret.Length == 0)
+            {
+                Console.WriteLine("This picture does not contain a face!");
+            }
+            else if (ret.Length > 1)
+            {
+                Console.WriteLine("This picture contains too many faces!");
+            }
+            else
+            {
+                Console.WriteLine("Picture was processed and saved.");
+                img2.Save(Server.MapPath("~/App_Data/uploads/processed_" + name));
+            }
+
             return ret;
         }
 
@@ -111,7 +126,6 @@ namespace WebFace.Controllers
             //var cap = capture.QueryFrame();
             Image<Rgb, Byte> x = new Image<Rgb, Byte>(bmp); //cap.ToImage<Rgb, DepthType>();
             var img = x.Convert<Emgu.CV.Structure.Gray, Byte>();
-
 
             var cascadeClassifier =
                 new CascadeClassifier(Server.MapPath("~/App_Data/" + "/haarcascade_frontalface_default.xml"));
@@ -125,7 +139,6 @@ namespace WebFace.Controllers
                         Size.Empty); //the actual face detection happens here
                     return faces;
                 }
-
             }
 
             return new Rectangle[0];
