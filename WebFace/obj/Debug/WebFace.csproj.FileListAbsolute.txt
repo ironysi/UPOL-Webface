@@ -478,3 +478,4 @@ C:\Users\XXX\Documents\Visual_Studio_Projects\FotkyKarty\WebFace\UPOL-Webface\We
 C:\Users\XXX\Documents\Visual_Studio_Projects\FotkyKarty\WebFace\UPOL-Webface\WebFace\bin\zh-cn\ZedGraph.resources.dll
 C:\Users\XXX\Documents\Visual_Studio_Projects\FotkyKarty\WebFace\UPOL-Webface\WebFace\bin\zh-tw\ZedGraph.resources.dll
 C:\Users\XXX\Documents\Visual_Studio_Projects\FotkyKarty\WebFace\UPOL-Webface\WebFace\obj\Debug\WebFace.csproj.CopyComplete
+C:\Users\XXX\Documents\Visual_Studio_Projects\FotkyKarty\WebFace\UPOL-Webface\WebFace\bin\System.ValueTuple.dll

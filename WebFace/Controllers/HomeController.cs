@@ -13,6 +13,9 @@ namespace WebFace.Controllers
 {
     public class HomeController : Controller
     {
+        private JObject ImgProperties = new JObject();
+
+
         public ActionResult Index()
         {
             return View();
@@ -56,7 +59,7 @@ namespace WebFace.Controllers
             return RedirectToAction("Index");
         }
 
-        public ActionResult Upload(HttpPostedFileBase file)
+        public ActionResult UploadAndProcess(HttpPostedFileBase file)
         {
             if (file != null && file.ContentLength > 0)
             {
@@ -68,8 +71,7 @@ namespace WebFace.Controllers
                 // we do not need to save original file (at development stage)
                 file.SaveAs(filePath);
 
-                var result = Convert(fileName);
-              
+                Convert(fileName);
             }
             else
             {
@@ -80,11 +82,12 @@ namespace WebFace.Controllers
             return RedirectToAction("Index");
         }
 
-        private Rectangle[] Convert(string name)
+        private void Convert(string fileName)
         {
-            var bmp = (Bitmap) Image.FromFile(Server.MapPath("~/App_Data/uploads/" + name));
+            var bmp = (Bitmap) Image.FromFile(Server.MapPath("~/App_Data/uploads/" + fileName));
 
-            SaveImgProperties(bmp, name);
+            // add original img size to imgProperties json
+            ImgProperties.Add("OriginalImageSize", bmp.Size.ToString());
 
             var img2 = new Bitmap(bmp, new Size(250, 300));
 
@@ -107,13 +110,21 @@ namespace WebFace.Controllers
             {
                 Console.WriteLine("This picture contains too many faces!");
             }
-            else
+            else if (ret.Length == 1)
             {
                 Console.WriteLine("Picture was processed and saved.");
-                img2.Save(Server.MapPath("~/App_Data/uploads/processed_" + name));
-            }
+                img2.Save(Server.MapPath("~/App_Data/uploads/processed_" + fileName));
 
-            return ret;
+                // get rectangle position to properties
+                ImgProperties.Add("faceTop", ret[0].Top);
+                ImgProperties.Add("faceBottom", ret[0].Bottom);
+                ImgProperties.Add("faceLeft", ret[0].Left);
+                ImgProperties.Add("faceRight", ret[0].Right);
+                ImgProperties.Add("faceWidth", ret[0].Width);
+                ImgProperties.Add("faceHeight", ret[0].Height);
+                // save json file
+                SaveImgProperties(fileName);
+            }
         }
 
         private void EvaluateAndSaveImg(string fullFilePath, string fileName)
@@ -121,6 +132,8 @@ namespace WebFace.Controllers
             var bmp = (Bitmap) Image.FromFile(fullFilePath);
 
             var img2 = new Bitmap(bmp, new Size(250, 300));
+
+            ImgProperties.Add("ProcessedImageSize", img2.Size.ToString());
 
             var ret = Analyze(img2);
 
@@ -133,11 +146,8 @@ namespace WebFace.Controllers
 
         private Rectangle[] Analyze(Bitmap bmp)
         {
-            //Emgu.CV.ICapture capture = new VideoCapture();
-
-            //var cap = capture.QueryFrame();
             Image<Rgb, Byte> x = new Image<Rgb, Byte>(bmp); //cap.ToImage<Rgb, DepthType>();
-            var img = x.Convert<Emgu.CV.Structure.Gray, Byte>();
+            var img = x.Convert<Gray, Byte>();
 
             var cascadeClassifier =
                 new CascadeClassifier(Server.MapPath("~/App_Data/" + "/haarcascade_frontalface_default.xml"));
@@ -152,18 +162,15 @@ namespace WebFace.Controllers
                     return faces;
                 }
             }
-
             return new Rectangle[0];
         }
 
-        private void SaveImgProperties(Bitmap bitmap, string fileName)
+        private void SaveImgProperties(string fileName)
         {
-            JObject imgProperties = new JObject(
-                new JProperty("imgSize", bitmap.Size.ToString()));
+            string json = JsonConvert.SerializeObject(ImgProperties, Formatting.Indented);
 
-            string json = JsonConvert.SerializeObject(imgProperties, Formatting.Indented);
-
-            System.IO.File.WriteAllText(Server.MapPath("~/App_Data/uploads/properties_" + fileName + ".json"), json);
+            System.IO.File.WriteAllText(Server.MapPath("~/App_Data/uploads/properties_" + 
+                                                       fileName.Substring(fileName.Length - 4) + ".json"), json);
         }
     }
 }
