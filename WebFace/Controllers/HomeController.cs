@@ -15,6 +15,8 @@ namespace WebFace.Controllers
     {
         private JObject ImgProperties = new JObject();
 
+        private const string haarFace = "haarcascade_frontalface_default.xml";
+        private const string haarEye = "haarCascade_eye.xml";
 
         public ActionResult Index()
         {
@@ -92,37 +94,39 @@ namespace WebFace.Controllers
             var img2 = new Bitmap(bmp, new Size(250, 300));
             ImgProperties.Add("ProcessedImageSize", img2.Size.ToString());
 
-            var ret = Analyze(img2);
+            // face detection
+            var faces = Detect(img2, haarFace);
           
             Graphics g = Graphics.FromImage(img2);
 
-            foreach (var rectangle in ret)
+            foreach (var rectangle in faces)
             {
-                g.FillRectangle(new SolidBrush(Color.FromArgb(50, 255, 0, 0)), rectangle);
+                //g.FillRectangle(new SolidBrush(Color.FromArgb(50, 255, 0, 0)), rectangle);
+                g.DrawRectangle(new Pen(Color.FromArgb(80, 255, 0, 0), (float)2.8), rectangle);
             }
-
             g.Save();
+       
 
-            if (ret.Length == 0)
+            // Eye detection
+            var eyes = Detect(img2, haarEye);
+
+            Graphics g2 = Graphics.FromImage(img2);
+
+            foreach (var rectangle in eyes)
             {
-                Console.WriteLine("This picture does not contain a face!");
+                g2.FillRectangle(new SolidBrush(Color.FromArgb(50, 0, 255, 0)), rectangle);
             }
-            else if (ret.Length > 1)
-            {
-                Console.WriteLine("This picture contains too many faces!");
-            }
-            else if (ret.Length == 1)
+
+            g2.Save();
+
+            if (faces.Length == 1 && eyes.Length == 2)
             {
                 Console.WriteLine("Picture was processed and saved.");
                 img2.Save(Server.MapPath("~/App_Data/processed/" + fileName));
 
-                // get rectangle position to properties
-                ImgProperties.Add("faceTop", ret[0].Top);
-                ImgProperties.Add("faceBottom", ret[0].Bottom);
-                ImgProperties.Add("faceLeft", ret[0].Left);
-                ImgProperties.Add("faceRight", ret[0].Right);
-                ImgProperties.Add("faceWidth", ret[0].Width);
-                ImgProperties.Add("faceHeight", ret[0].Height);
+                // get img properties
+                GetImgProperties(faces[0], eyes[0], eyes[1]);
+                
                 // save json file
                 SaveImgProperties(fileName);
             }
@@ -134,7 +138,7 @@ namespace WebFace.Controllers
 
             var img2 = new Bitmap(bmp, new Size(250, 300));
 
-            var ret = Analyze(img2);
+            var ret = Detect(img2, "");
 
             if(ret.Length == 1)
                 img2.Save(Server.MapPath("~/App_Data/cleaning/clean_data/" + fileName));
@@ -143,13 +147,13 @@ namespace WebFace.Controllers
         }
 
 
-        private Rectangle[] Analyze(Bitmap bmp)
+        private Rectangle[] Detect(Bitmap bmp, string haarCascadeFile)
         {
-            Image<Rgb, Byte> x = new Image<Rgb, Byte>(bmp); //cap.ToImage<Rgb, DepthType>();
+            Image<Rgb, Byte> x = new Image<Rgb, Byte>(bmp); 
             var img = x.Convert<Gray, Byte>();
 
             var cascadeClassifier =
-                new CascadeClassifier(Server.MapPath("~/App_Data/" + "/haarcascade_frontalface_default.xml"));
+                new CascadeClassifier(Server.MapPath("~/App_Data/HaarCascade/" + haarCascadeFile));
 
             using (var imageFrame = x)
             {
@@ -164,6 +168,24 @@ namespace WebFace.Controllers
             return new Rectangle[0];
         }
 
+        private void GetImgProperties(Rectangle face, Rectangle eye1, Rectangle eye2)
+        {
+                // get face position
+                ImgProperties.Add("faceTop", face.Top);
+                ImgProperties.Add("faceBottom", face.Bottom);
+                ImgProperties.Add("faceLeft", face.Left);
+                ImgProperties.Add("faceRight", face.Right);
+                ImgProperties.Add("faceWidth", face.Width);
+                ImgProperties.Add("faceHeight", face.Height);
+                // get eye positions
+                ImgProperties.Add("eye_1_horizontal",  (eye1.Top + eye1.Bottom)/2);
+                ImgProperties.Add("eye_1_vertical", (eye1.Left + eye1.Right) / 2);
+                ImgProperties.Add("eye_2_horizontal", (eye2.Top + eye2.Bottom) / 2);
+                ImgProperties.Add("eye_2_vertical", (eye2.Left + eye2.Right) / 2);
+                ImgProperties.Add("eyeTilt", ((eye1.Top + eye1.Bottom) / 2) - 
+                                             ((eye2.Top + eye2.Bottom) / 2));
+        }
+
         private void SaveImgProperties(string fileName)
         {
             string json = JsonConvert.SerializeObject(ImgProperties, Formatting.Indented);
@@ -171,9 +193,6 @@ namespace WebFace.Controllers
             System.IO.File.WriteAllText(Server.MapPath("~/App_Data/processed/properties_" + 
                                                        fileName.Substring(0, fileName.Length - 4) + ".json"), json);
         }
-
-
-
   
     }
 }

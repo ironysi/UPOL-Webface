@@ -167,6 +167,7 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="App_Data\haarCascade_eye.xml" />
     <Content Include="App_Data\skupina.jpg" />
     <Content Include="App_Data\dom.jpg" />
     <Content Include="App_Data\haarcascade_frontalface_default.xml" />
