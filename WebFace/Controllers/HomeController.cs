@@ -90,6 +90,7 @@ namespace WebFace.Controllers
             ImgProperties.Add("OriginalImageSize", bmp.Size.ToString());
 
             var img2 = new Bitmap(bmp, new Size(250, 300));
+            ImgProperties.Add("ProcessedImageSize", img2.Size.ToString());
 
             var ret = Analyze(img2);
           
@@ -113,7 +114,7 @@ namespace WebFace.Controllers
             else if (ret.Length == 1)
             {
                 Console.WriteLine("Picture was processed and saved.");
-                img2.Save(Server.MapPath("~/App_Data/uploads/processed_" + fileName));
+                img2.Save(Server.MapPath("~/App_Data/processed/" + fileName));
 
                 // get rectangle position to properties
                 ImgProperties.Add("faceTop", ret[0].Top);
@@ -133,14 +134,12 @@ namespace WebFace.Controllers
 
             var img2 = new Bitmap(bmp, new Size(250, 300));
 
-            ImgProperties.Add("ProcessedImageSize", img2.Size.ToString());
-
             var ret = Analyze(img2);
 
             if(ret.Length == 1)
-                img2.Save(Server.MapPath("~/App_Data/clean_data/" + fileName));
+                img2.Save(Server.MapPath("~/App_Data/cleaning/clean_data/" + fileName));
             else
-                img2.Save(Server.MapPath("~/App_Data/dirty_data/" + fileName));
+                img2.Save(Server.MapPath("~/App_Data/cleaning/dirty_data/" + fileName));
         }
 
 
@@ -169,8 +168,12 @@ namespace WebFace.Controllers
         {
             string json = JsonConvert.SerializeObject(ImgProperties, Formatting.Indented);
 
-            System.IO.File.WriteAllText(Server.MapPath("~/App_Data/uploads/properties_" + 
-                                                       fileName.Substring(fileName.Length - 4) + ".json"), json);
+            System.IO.File.WriteAllText(Server.MapPath("~/App_Data/processed/properties_" + 
+                                                       fileName.Substring(0, fileName.Length - 4) + ".json"), json);
         }
+
+
+
+  
     }
 }
