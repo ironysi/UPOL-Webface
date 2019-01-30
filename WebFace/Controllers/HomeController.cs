@@ -3,6 +3,7 @@ using System.Drawing;
 using System.IO;
 using System.Web;
 using System.Web.Mvc;
+using System.Diagnostics.CodeAnalysis;
 
 using Emgu.CV;
 using Emgu.CV.Structure;
@@ -12,36 +13,29 @@ using Newtonsoft.Json.Linq;
 
 namespace WebFace.Controllers
 {
+    
+
     public class HomeController : Controller
     {
-        private JObject ImgProperties = new JObject();
+        private JObject imgProperties = new JObject();
 
-        private const string haarFace = "haarcascade_frontalface_default.xml";
-        private const string haarEye = "haarCascade_eye.xml";
+        private const string HaarFace = "haarcascade_frontalface_default.xml";
+        private const string HaarEye = "haarCascade_eye.xml";
 
         public ActionResult Index()
         {
             return View();
         }
 
-        public ActionResult About()
-        {
-            ViewBag.Message = "Your application description page.";
 
-            return View();
-        }
-
-        public ActionResult Contact()
-        {
-            ViewBag.Message = "Your contact page.";
-
-            return View();
-        }
-
+        /// <summary>
+        /// Takes all files from "App_Data/uploads/" and sorts them into "clean_data" and "dirty_data" based on face detection. 
+        /// </summary>
+        /// <returns>
+        /// The <see cref="ActionResult"/>.
+        /// </returns>
         public ActionResult CleanFolder()
         {
-            string folderName = "~/App_Data";
-
             DirectoryInfo d = new DirectoryInfo(Server.MapPath("~/App_Data/"));
             FileInfo[] files = d.GetFiles("*.jpg");
 
@@ -50,10 +44,11 @@ namespace WebFace.Controllers
             {
                 // extract only the filename
                 var fileName = Path.GetFileName(file.Name);
-                // store the file inside ~/App_Data/uploads folder
 
-                var filePath = Path.Combine(Server.MapPath("~/App_Data/uploads"), fileName 
-                                                                                  ?? throw new InvalidOperationException());
+                // store the file inside ~/App_Data/uploads folder
+                var filePath = Path.Combine(
+                    Server.MapPath("~/App_Data/uploads"),
+                    fileName ?? throw new InvalidOperationException());
 
                 file.CopyTo(filePath, overwrite:true);
 
@@ -63,18 +58,28 @@ namespace WebFace.Controllers
             return RedirectToAction("Index");
         }
 
+        /// <summary>
+        /// The upload and process fille.
+        /// </summary>
+        /// <param name="file">
+        /// The file.
+        /// </param>
+        /// <returns>
+        /// The <see cref="ActionResult"/>.
+        /// </returns>
         public ActionResult UploadAndProcess(HttpPostedFileBase file)
         {
             if (file != null && file.ContentLength > 0)
             {
                 // extract only the filename
                 var fileName = Path.GetFileName(file.FileName);
+
                 // store the file inside ~/App_Data/uploads folder
                 var filePath = Path.Combine(Server.MapPath("~/App_Data/uploads"), fileName ?? throw new InvalidOperationException());
 
                 // we do not need to save original file (at development stage)
-                file.SaveAs(filePath);
-
+                // file.SaveAs(filePath);
+                // ReSharper disable once ArrangeThisQualifier
                 Convert(fileName);
             }
             else
@@ -86,34 +91,42 @@ namespace WebFace.Controllers
             return RedirectToAction("Index");
         }
 
+        /// <summary>
+        /// Applies all transformation and detection methods to given image.
+        /// Saves image to 'processed' folder.
+        /// </summary>
+        /// <param name="fileName">
+        /// The image file name.
+        /// </param>
         private void Convert(string fileName)
         {
             var bmp = (Bitmap) Image.FromFile(Server.MapPath("~/App_Data/uploads/" + fileName));
 
             // add original img size to imgProperties json
-            ImgProperties.Add("OriginalImageSize", bmp.Size.ToString());
+            // ReSharper disable once ArrangeThisQualifier
+            this.imgProperties.Add("OriginalImageSize", bmp.Size.ToString());
 
             var img2 = new Bitmap(bmp, new Size(250, 300));
-            ImgProperties.Add("ProcessedImageSize", img2.Size.ToString());
+            this.imgProperties.Add("ProcessedImageSize", img2.Size.ToString());
 
             // Crop is not working very well...
             img2 = ImageUtils.Crop(img2);
 
             // face detection
-            var faces = Detect(img2, haarFace);
+            var faces = Detect(img2, HaarFace);
           
             Graphics g = Graphics.FromImage(img2);
 
             foreach (var rectangle in faces)
             {
-                //g.FillRectangle(new SolidBrush(Color.FromArgb(50, 255, 0, 0)), rectangle);
+                // g.FillRectangle(new SolidBrush(Color.FromArgb(50, 255, 0, 0)), rectangle);
                 g.DrawRectangle(new Pen(Color.FromArgb(80, 255, 0, 0), (float)2.8), rectangle);
             }
             g.Save();
        
 
             // Eye detection
-            var eyes = Detect(img2, haarEye);
+            var eyes = Detect(img2, HaarEye);
 
             Graphics g2 = Graphics.FromImage(img2);
 
@@ -137,21 +150,45 @@ namespace WebFace.Controllers
             }
         }
 
+        /// <summary>
+        /// Method for "cleaning" folder full of images.
+        /// Detects images that contain face and saves them to "clean_data" folder,
+        /// ones that don't will be saved to "dirty_data"
+        /// </summary>
+        /// <param name="fullFilePath">
+        /// The full file path.
+        /// </param>
+        /// <param name="fileName">
+        /// The file name.
+        /// </param>
+        [SuppressMessage("StyleCop.CSharp.LayoutRules", "SA1503:CurlyBracketsMustNotBeOmitted", Justification = "Reviewed. Suppression is OK here.")]
         private void EvaluateAndSaveImg(string fullFilePath, string fileName)
         {
             var bmp = (Bitmap) Image.FromFile(fullFilePath);
 
             var img2 = new Bitmap(bmp, new Size(250, 300));
 
-            var ret = Detect(img2, "");
+            var ret = Detect(img2, HaarFace);
 
-            if(ret.Length == 1)
+            if (ret.Length == 1)
                 img2.Save(Server.MapPath("~/App_Data/cleaning/clean_data/" + fileName));
             else
                 img2.Save(Server.MapPath("~/App_Data/cleaning/dirty_data/" + fileName));
         }
 
-
+        /// <summary>
+        /// Detects objects in the image.
+        /// Objects are detected based on 'haar' file that is passed in.
+        /// </summary>
+        /// <param name="bmp">
+        /// Bitmap of image
+        /// </param>
+        /// <param name="haarCascadeFile">
+        /// The haar cascade file. (Pretrained file)
+        /// </param>
+        /// <returns>
+        /// The <see cref="Rectangle[]"/>.
+        /// </returns>
         private Rectangle[] Detect(Bitmap bmp, string haarCascadeFile)
         {
             Image<Rgb, Byte> x = new Image<Rgb, Byte>(bmp); 
@@ -173,27 +210,45 @@ namespace WebFace.Controllers
             return new Rectangle[0];
         }
 
+        /// <summary>
+        /// Fills json object with properties of image.
+        /// </summary>
+        /// <param name="face">
+        /// The face.
+        /// </param>
+        /// <param name="eye1">
+        /// The eye 1.
+        /// </param>
+        /// <param name="eye2">
+        /// The eye 2.
+        /// </param>
         private void GetImgProperties(Rectangle face, Rectangle eye1, Rectangle eye2)
         {
                 // get face position
-                ImgProperties.Add("faceTop", face.Top);
-                ImgProperties.Add("faceBottom", face.Bottom);
-                ImgProperties.Add("faceLeft", face.Left);
-                ImgProperties.Add("faceRight", face.Right);
-                ImgProperties.Add("faceWidth", face.Width);
-                ImgProperties.Add("faceHeight", face.Height);
+                this.imgProperties.Add("faceTop", face.Top);
+                this.imgProperties.Add("faceBottom", face.Bottom);
+                this.imgProperties.Add("faceLeft", face.Left);
+                this.imgProperties.Add("faceRight", face.Right);
+                this.imgProperties.Add("faceWidth", face.Width);
+                this.imgProperties.Add("faceHeight", face.Height);
                 // get eye positions
-                ImgProperties.Add("eye_1_horizontal",  (eye1.Top + eye1.Bottom)/2);
-                ImgProperties.Add("eye_1_vertical", (eye1.Left + eye1.Right) / 2);
-                ImgProperties.Add("eye_2_horizontal", (eye2.Top + eye2.Bottom) / 2);
-                ImgProperties.Add("eye_2_vertical", (eye2.Left + eye2.Right) / 2);
-                ImgProperties.Add("eyeTilt", ((eye1.Top + eye1.Bottom) / 2) - 
+                this.imgProperties.Add("eye_1_horizontal",  (eye1.Top + eye1.Bottom)/2);
+                this.imgProperties.Add("eye_1_vertical", (eye1.Left + eye1.Right) / 2);
+                this.imgProperties.Add("eye_2_horizontal", (eye2.Top + eye2.Bottom) / 2);
+                this.imgProperties.Add("eye_2_vertical", (eye2.Left + eye2.Right) / 2);
+                this.imgProperties.Add("eyeTilt", ((eye1.Top + eye1.Bottom) / 2) - 
                                              ((eye2.Top + eye2.Bottom) / 2));
         }
 
+        /// <summary>
+        /// Saves properties of image to the 'filename'.json file.
+        /// </summary>
+        /// <param name="fileName">
+        /// Filename of the picture.
+        /// </param>
         private void SaveImgProperties(string fileName)
         {
-            string json = JsonConvert.SerializeObject(ImgProperties, Formatting.Indented);
+            string json = JsonConvert.SerializeObject(this.imgProperties, Formatting.Indented);
 
             System.IO.File.WriteAllText(Server.MapPath("~/App_Data/processed/properties_" + 
                                                        fileName.Substring(0, fileName.Length - 4) + ".json"), json);
