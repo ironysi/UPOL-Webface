@@ -9,6 +9,7 @@ using Emgu.CV.Structure;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
+
 namespace WebFace.Controllers
 {
     public class HomeController : Controller
@@ -51,7 +52,8 @@ namespace WebFace.Controllers
                 var fileName = Path.GetFileName(file.Name);
                 // store the file inside ~/App_Data/uploads folder
 
-                var filePath = Path.Combine(Server.MapPath("~/App_Data/uploads"), fileName ?? throw new InvalidOperationException());
+                var filePath = Path.Combine(Server.MapPath("~/App_Data/uploads"), fileName 
+                                                                                  ?? throw new InvalidOperationException());
 
                 file.CopyTo(filePath, overwrite:true);
 
@@ -93,6 +95,9 @@ namespace WebFace.Controllers
 
             var img2 = new Bitmap(bmp, new Size(250, 300));
             ImgProperties.Add("ProcessedImageSize", img2.Size.ToString());
+
+            // Crop is not working very well...
+            img2 = ImageUtils.Crop(img2);
 
             // face detection
             var faces = Detect(img2, haarFace);
@@ -193,6 +198,6 @@ namespace WebFace.Controllers
             System.IO.File.WriteAllText(Server.MapPath("~/App_Data/processed/properties_" + 
                                                        fileName.Substring(0, fileName.Length - 4) + ".json"), json);
         }
-  
+
     }
 }
