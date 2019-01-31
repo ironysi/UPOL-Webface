@@ -479,3 +479,13 @@ C:\Users\XXX\Documents\Visual_Studio_Projects\FotkyKarty\WebFace\UPOL-Webface\We
 C:\Users\XXX\Documents\Visual_Studio_Projects\FotkyKarty\WebFace\UPOL-Webface\WebFace\bin\zh-tw\ZedGraph.resources.dll
 C:\Users\XXX\Documents\Visual_Studio_Projects\FotkyKarty\WebFace\UPOL-Webface\WebFace\obj\Debug\WebFace.csproj.CopyComplete
 C:\Users\XXX\Documents\Visual_Studio_Projects\FotkyKarty\WebFace\UPOL-Webface\WebFace\bin\System.ValueTuple.dll
+C:\Users\XXX\Documents\Visual_Studio_Projects\FotkyKarty\WebFace\UPOL-Webface\WebFace\bin\Magick.NET-Q8-AnyCPU.dll
+C:\Users\XXX\Documents\Visual_Studio_Projects\FotkyKarty\WebFace\UPOL-Webface\WebFace\bin\nQuant.Core.dll
+C:\Users\XXX\Documents\Visual_Studio_Projects\FotkyKarty\WebFace\UPOL-Webface\WebFace\bin\Magick.NET-Q8-AnyCPU.xml
+C:\Users\XXX\Documents\Visual_Studio_Projects\FotkyKarty\WebFace\UPOL-Webface\WebFace\bin\nQuant.Core.pdb
+C:\Users\XXX\Documents\Visual_Studio_Projects\FotkyKarty\WebFace\UPOL-Webface\WebFace\bin\AForge.dll
+C:\Users\XXX\Documents\Visual_Studio_Projects\FotkyKarty\WebFace\UPOL-Webface\WebFace\bin\AForge.Imaging.dll
+C:\Users\XXX\Documents\Visual_Studio_Projects\FotkyKarty\WebFace\UPOL-Webface\WebFace\bin\AForge.Math.dll
+C:\Users\XXX\Documents\Visual_Studio_Projects\FotkyKarty\WebFace\UPOL-Webface\WebFace\bin\AForge.xml
+C:\Users\XXX\Documents\Visual_Studio_Projects\FotkyKarty\WebFace\UPOL-Webface\WebFace\bin\AForge.Imaging.xml
+C:\Users\XXX\Documents\Visual_Studio_Projects\FotkyKarty\WebFace\UPOL-Webface\WebFace\bin\AForge.Math.xml

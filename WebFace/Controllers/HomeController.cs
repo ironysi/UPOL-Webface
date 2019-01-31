@@ -1,26 +1,31 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Imaging;
 using System.IO;
+using System.Linq;
 using System.Web;
 using System.Web.Mvc;
 
 using Emgu.CV;
 using Emgu.CV.Structure;
 
+using ImageMagick;
+
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace WebFace.Controllers
 {
-    using System.Collections.Generic;
-    using System.Linq;
-
-    using ImageMagick;
-
     public class HomeController : Controller
     {
-        private readonly JObject imgProperties = new JObject();
+        private readonly MagickImageCollection redHistograms = new MagickImageCollection();
+        private readonly MagickImageCollection greenHistograms = new MagickImageCollection();
+        private readonly MagickImageCollection blueHistograms = new MagickImageCollection();
 
+        private readonly MagickImageCollection facesCollection = new MagickImageCollection();
+        
+        private readonly JObject imgProperties = new JObject();
         private readonly Dictionary<string, string> photoDict = new Dictionary<string, string>();
 
         private const string HaarFace = "haarcascade_frontalface_default.xml";
@@ -45,17 +50,14 @@ namespace WebFace.Controllers
 
             foreach (var file in files)
             {
-                // extract only the filename
-                var fileName = Path.GetFileName(file.Name);
-
                 // store the file inside ~/App_Data/uploads folder
                 var filePath = Path.Combine(
                     Server.MapPath("~/App_Data/uploads"),
-                    fileName ?? throw new InvalidOperationException());
+                    file.Name ?? throw new InvalidOperationException());
 
                 // file.CopyTo(filePath, overwrite:true);
 
-                EvaluateAndSaveImg(filePath, fileName);
+                EvaluateAndSaveImg(filePath, file.Name);
             }
 
             var csv = string.Join(
@@ -80,15 +82,12 @@ namespace WebFace.Controllers
         {
             if (file != null && file.ContentLength > 0)
             {
-                // extract only the filename
-                var fileName = Path.GetFileName(file.FileName);
-
                 // store the file inside ~/App_Data/uploads folder
-                var filePath = Path.Combine(Server.MapPath("~/App_Data/uploads"), fileName ?? throw new InvalidOperationException());
+                var filePath = Path.Combine(Server.MapPath("~/App_Data/uploads"), file.FileName ?? throw new InvalidOperationException());
 
                 file.SaveAs(filePath);
                 // ReSharper disable once ArrangeThisQualifier
-                Convert(fileName);
+                Convert(file.FileName);
             }
             else
             {
@@ -96,6 +95,77 @@ namespace WebFace.Controllers
             }
 
             // redirect back to the index action to show the form once again
+            return RedirectToAction("Index");
+        }
+
+        public ActionResult Histogram()
+        {
+            DirectoryInfo dir = new DirectoryInfo(Server.MapPath("~/App_Data/cleaning/clean_data/"));
+            FileInfo[] files = dir.GetFiles("*.jpg");
+
+            foreach (var file in files)
+            {
+                var bmp = (Bitmap)Image.FromFile(Server.MapPath("~/App_Data/cleaning/clean_data/" + file.Name));
+                var img2 = new Bitmap(bmp, new Size(250, 300));
+                SaveHistograms(img2);
+            }
+
+            this.redHistograms.Evaluate(EvaluateOperator.Mean).Write(Server.MapPath(
+                "~/App_Data/processed/redHistogramMean_positives.png"));
+            this.greenHistograms.Evaluate(EvaluateOperator.Mean).Write(Server.MapPath(
+                "~/App_Data/processed/greenHistogramMean_positives.png"));
+            this.blueHistograms.Evaluate(EvaluateOperator.Mean).Write(Server.MapPath(
+                "~/App_Data/processed/blueHistogramMean_positives.png"));
+
+            return RedirectToAction("Index");
+        }
+
+        public ActionResult SuperPosition()
+        {
+            DirectoryInfo dir = new DirectoryInfo(Server.MapPath("~/App_Data/cleaning/dirty_data/"));
+            FileInfo[] files = dir.GetFiles("*.jpg");
+
+            int i = 0;
+
+            foreach (var file in files)
+            {
+                var bmp = (Bitmap)Image.FromFile(Server.MapPath("~/App_Data/cleaning/dirty_data/" + file.Name));
+                var img2 = new Bitmap(bmp, new Size(250, 300));
+
+                // faces
+                var faces = Detect(img2, HaarFace);
+
+                Bitmap clearImg = new Bitmap(250, 300, PixelFormat.Format16bppRgb555);
+                Graphics g = Graphics.FromImage(clearImg);
+
+                foreach (var rectangle in faces)
+                {
+                    g.FillRectangle(new SolidBrush(Color.FromArgb(90, 255, 0, 0)), rectangle);
+                }
+
+                g.Save();
+
+                var eyes = Detect(img2, HaarEye);
+
+                Graphics g2 = Graphics.FromImage(clearImg);
+
+                foreach (var rectangle in eyes)
+                {
+                    g2.FillRectangle(new SolidBrush(Color.FromArgb(90, 0, 255, 0)), rectangle);
+                }
+
+                g2.Save();
+
+                this.facesCollection.Add(new MagickImage(clearImg));
+
+                i++;
+                if (i == 1000)
+                    break;
+            }
+
+            this.facesCollection.Evaluate(EvaluateOperator.Mean).Write(Server.MapPath(
+                "~/App_Data/processed/faceAndEyesSuperposition_negative.png"));
+
             return RedirectToAction("Index");
         }
 
@@ -118,10 +188,11 @@ namespace WebFace.Controllers
             this.imgProperties.Add("ProcessedImageSize", img2.Size.ToString());
 
             // Create and save histograms of the image
-            SaveHistograms(img2);
+            // SaveHistograms(img2);
 
             // Crop is not working very well...
             // img2 = ImageUtils.Crop(img2);
+            img2 = ImageUtils.AutoCrop(img2);
 
             // face detection
             var faces = Detect(img2, HaarFace);
@@ -281,7 +352,7 @@ namespace WebFace.Controllers
             System.IO.File.WriteAllText(Server.MapPath("~/App_Data/processed/properties_" + 
                                                        fileName.Substring(0, fileName.Length - 4) + ".json"), json);
         }
-
+       
         private void SaveHistograms(Bitmap image)
         {
             Image<Gray, Byte> img2Blue = new Image<Rgb, byte>(image)[2];
@@ -289,32 +360,16 @@ namespace WebFace.Controllers
             Image<Gray, Byte> img2Red = new Image<Rgb, byte>(image)[0];
 
             var redHistogram = ImageUtils.ApplyHistogram(img2Red, new Pen(Brushes.Red));
-            redHistogram.Save(Server.MapPath("~/App_Data/processed/redHist.jpg"));
+            this.redHistograms.Add(new MagickImage(redHistogram));
+            // redHistogram.Save(Server.MapPath("~/App_Data/processed/redHist1.jpg"));
+
             var greenHistogram = ImageUtils.ApplyHistogram(img2Green, new Pen(Brushes.LimeGreen));
-            greenHistogram.Save(Server.MapPath("~/App_Data/processed/greenHist.jpg"));
+            this.greenHistograms.Add(new MagickImage(greenHistogram));
+            // greenHistogram.Save(Server.MapPath("~/App_Data/processed/greenHist1.jpg"));
+
             var blueHistogram = ImageUtils.ApplyHistogram(img2Blue, new Pen(Brushes.Blue));
-            blueHistogram.Save(Server.MapPath("~/App_Data/processed/blueHist.jpg"));
-        }
-
-        public void AverageImages()
-        {
-            using (MagickImageCollection images = new MagickImageCollection())
-            {
-                // Add the first image
-                MagickImage first = new MagickImage("Snakeware.png");
-                images.Add(first);
-
-                // Add the second image
-                MagickImage second = new MagickImage("Snakeware.png");
-                images.Add(second);
-
-                // Create an Average from both images
-                using (IMagickImage result = images.Evaluate(EvaluateOperator.Mean))
-                {
-                    // Save the result
-                    result.Write("Mean.png");
-                }
-            }
+            this.blueHistograms.Add(new MagickImage(blueHistogram));
+            // blueHistogram.Save(Server.MapPath("~/App_Data/processed/blueHist1.jpg"));
         }
     }
 }

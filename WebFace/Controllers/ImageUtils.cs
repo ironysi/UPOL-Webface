@@ -6,7 +6,15 @@ using Emgu.CV.Structure;
 
 namespace WebFace.Controllers
 {
+    using System.Drawing.Imaging;
+    using System.Linq;
+
+    using AForge.Imaging;
+    using AForge.Imaging.Filters;
+
     using ImageMagick;
+
+    using Image = System.Drawing.Image;
 
     public static class ImageUtils
     {
@@ -73,7 +81,7 @@ namespace WebFace.Controllers
 
         private static Bitmap DrawHistogram(double maxVal, int width, int height, float[] histData, Pen pen)
         {
-            Bitmap histo = new Bitmap(width, height);
+            Bitmap histo = new Bitmap(width, height, PixelFormat.Format16bppRgb555);
             Graphics g = Graphics.FromImage(histo);
             g.Clear(SystemColors.Window);
 
@@ -192,27 +200,62 @@ namespace WebFace.Controllers
             }
         }
 
-
-        public static void AverageImages()
+        public static Bitmap AutoCrop(Bitmap selectedImage)
         {
-            using (MagickImageCollection images = new MagickImageCollection())
+            Bitmap autoCropImage = null;
+            try
             {
-                // Add the first image
-                MagickImage first = new MagickImage("Snakeware.png");
-                images.Add(first);
+                autoCropImage = selectedImage;
 
-                // Add the second image
-                MagickImage second = new MagickImage("Snakeware.png");
-                images.Add(second);
+                // create gray scale filter (BT709)
+                Grayscale filter = new Grayscale(0.2125, 0.7154, 0.0721);
+                Bitmap grayImage = filter.Apply(autoCropImage);
 
-                // Create an Average from both images
-                using (IMagickImage result = images.Evaluate(EvaluateOperator.Mean))
+                // create instance of skew checker
+                DocumentSkewChecker skewChecker = new DocumentSkewChecker();
+
+                // get documents skew angle
+                double angle = 0; // skewChecker.GetSkewAngle(grayImage);
+                                  // create rotation filter
+                RotateBilinear rotationFilter = new RotateBilinear(-angle);
+                rotationFilter.FillColor = Color.White;
+
+                // rotate image applying the filter
+                Bitmap rotatedImage = rotationFilter.Apply(grayImage);
+                new ContrastStretch().ApplyInPlace(rotatedImage);
+                new Threshold(25).ApplyInPlace(rotatedImage);
+                BlobCounter bc = new BlobCounter();
+                bc.FilterBlobs = true;
+
+                bc.ProcessImage(rotatedImage);
+                Rectangle[] rects = bc.GetObjectsRectangles();
+
+                if (rects.Length == 0)
                 {
-                    // Save the result
-                    result.Write("Mean.png");
+                    // CAN'T CROP
+                }
+                else if (rects.Length == 1)
+                {
+                    autoCropImage = autoCropImage.Clone(rects[0], autoCropImage.PixelFormat);
+                }
+                else if (rects.Length > 1)
+                {
+                    // get largets rect
+                    Console.WriteLine("Using largest rectangle found in image ");
+                    var r2 = rects.OrderByDescending(r => r.Height * r.Width).ToList();
+                    autoCropImage = autoCropImage.Clone(r2[0], autoCropImage.PixelFormat);
+                }
+                else
+                {
+                    Console.WriteLine("Huh? on image ");
                 }
             }
-        }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
 
+            return autoCropImage;
+        }
     }
 }
