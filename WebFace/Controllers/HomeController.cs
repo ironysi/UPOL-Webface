@@ -15,6 +15,8 @@ namespace WebFace.Controllers
     using System.Collections.Generic;
     using System.Linq;
 
+    using ImageMagick;
+
     public class HomeController : Controller
     {
         private readonly JObject imgProperties = new JObject();
@@ -292,6 +294,27 @@ namespace WebFace.Controllers
             greenHistogram.Save(Server.MapPath("~/App_Data/processed/greenHist.jpg"));
             var blueHistogram = ImageUtils.ApplyHistogram(img2Blue, new Pen(Brushes.Blue));
             blueHistogram.Save(Server.MapPath("~/App_Data/processed/blueHist.jpg"));
+        }
+
+        public void AverageImages()
+        {
+            using (MagickImageCollection images = new MagickImageCollection())
+            {
+                // Add the first image
+                MagickImage first = new MagickImage("Snakeware.png");
+                images.Add(first);
+
+                // Add the second image
+                MagickImage second = new MagickImage("Snakeware.png");
+                images.Add(second);
+
+                // Create an Average from both images
+                using (IMagickImage result = images.Evaluate(EvaluateOperator.Mean))
+                {
+                    // Save the result
+                    result.Write("Mean.png");
+                }
+            }
         }
     }
 }

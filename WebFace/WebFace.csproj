@@ -49,9 +49,6 @@
     <Reference Include="Dianoga, Version=3.1.1.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\Dianoga.3.1.1\lib\net452\Dianoga.dll</HintPath>
     </Reference>
-    <Reference Include="Dianoga.ImageMagick, Version=1.2.3.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\Dianoga.ImageMagick.1.2.4\lib\net452\Dianoga.ImageMagick.dll</HintPath>
-    </Reference>
     <Reference Include="Emgu.CV.UI, Version=3.4.3.3016, Culture=neutral, PublicKeyToken=7281126722ab4438, processorArchitecture=MSIL">
       <HintPath>..\packages\EMGU.CV.3.4.3.3016\lib\net35\Emgu.CV.UI.dll</HintPath>
     </Reference>
@@ -179,8 +176,6 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="App_Data\Dianoga Tools\imagemagick\magic.xml" />
-    <Content Include="App_Data\Dianoga Tools\imagemagick\magick.exe" />
     <Content Include="App_Data\Dianoga Tools\mozjpeg_3.1_x86\jpegtran.exe" />
     <Content Include="App_Data\Dianoga Tools\mozjpeg_3.1_x86\libjpeg-62.dll" />
     <Content Include="App_Data\Dianoga Tools\mozjpeg_3.1_x86\LICENSE.txt" />
@@ -586,7 +581,6 @@
     <Content Include="App_Config\Include\Dianoga\Dianoga.Jpeg.config" />
     <Content Include="App_Config\Include\Dianoga\Dianoga.ExcludePaths.config.example" />
     <Content Include="App_Config\Include\Dianoga\Dianoga.config" />
-    <Content Include="App_Config\Include\Dianoga\Dianoga.Z.ImageMagick.config" />
     <None Include="Scripts\jquery-3.3.1.intellisense.js" />
     <Content Include="Scripts\jquery-3.3.1.js" />
     <Content Include="Scripts\jquery-3.3.1.min.js" />

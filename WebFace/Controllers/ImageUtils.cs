@@ -6,6 +6,8 @@ using Emgu.CV.Structure;
 
 namespace WebFace.Controllers
 {
+    using ImageMagick;
+
     public static class ImageUtils
     {
         /// <summary>
@@ -204,7 +206,7 @@ namespace WebFace.Controllers
                 images.Add(second);
 
                 // Create an Average from both images
-                using (MagickImage result = images.Evaluate(EvaluateOperator.Mean))
+                using (IMagickImage result = images.Evaluate(EvaluateOperator.Mean))
                 {
                     // Save the result
                     result.Write("Mean.png");
