@@ -3,30 +3,32 @@ using System.Drawing;
 using System.IO;
 using System.Web;
 using System.Web.Mvc;
-using System.Diagnostics.CodeAnalysis;
 
 using Emgu.CV;
 using Emgu.CV.Structure;
+
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-
 namespace WebFace.Controllers
 {
-    
+    using System.Collections.Generic;
+    using System.Linq;
 
     public class HomeController : Controller
     {
-        private JObject imgProperties = new JObject();
+        private readonly JObject imgProperties = new JObject();
+
+        private readonly Dictionary<string, string> photoDict = new Dictionary<string, string>();
 
         private const string HaarFace = "haarcascade_frontalface_default.xml";
         private const string HaarEye = "haarCascade_eye.xml";
+
 
         public ActionResult Index()
         {
             return View();
         }
-
 
         /// <summary>
         /// Takes all files from "App_Data/uploads/" and sorts them into "clean_data" and "dirty_data" based on face detection. 
@@ -36,9 +38,8 @@ namespace WebFace.Controllers
         /// </returns>
         public ActionResult CleanFolder()
         {
-            DirectoryInfo d = new DirectoryInfo(Server.MapPath("~/App_Data/"));
-            FileInfo[] files = d.GetFiles("*.jpg");
-
+            DirectoryInfo dir = new DirectoryInfo(Server.MapPath("~/App_Data/"));
+            FileInfo[] files = dir.GetFiles("*.jpg");
 
             foreach (var file in files)
             {
@@ -50,10 +51,16 @@ namespace WebFace.Controllers
                     Server.MapPath("~/App_Data/uploads"),
                     fileName ?? throw new InvalidOperationException());
 
-                file.CopyTo(filePath, overwrite:true);
+                // file.CopyTo(filePath, overwrite:true);
 
                 EvaluateAndSaveImg(filePath, fileName);
             }
+
+            var csv = string.Join(
+                Environment.NewLine,
+                this.photoDict.Select(x => x.Key + "," + x.Value));
+
+            System.IO.File.WriteAllText(Server.MapPath("~/App_Data/stats.csv"), csv);
 
             return RedirectToAction("Index");
         }
@@ -77,8 +84,7 @@ namespace WebFace.Controllers
                 // store the file inside ~/App_Data/uploads folder
                 var filePath = Path.Combine(Server.MapPath("~/App_Data/uploads"), fileName ?? throw new InvalidOperationException());
 
-                // we do not need to save original file (at development stage)
-                // file.SaveAs(filePath);
+                file.SaveAs(filePath);
                 // ReSharper disable once ArrangeThisQualifier
                 Convert(fileName);
             }
@@ -100,7 +106,7 @@ namespace WebFace.Controllers
         /// </param>
         private void Convert(string fileName)
         {
-            var bmp = (Bitmap) Image.FromFile(Server.MapPath("~/App_Data/uploads/" + fileName));
+            var bmp = (Bitmap)Image.FromFile(Server.MapPath("~/App_Data/uploads/" + fileName));
 
             // add original img size to imgProperties json
             // ReSharper disable once ArrangeThisQualifier
@@ -109,8 +115,11 @@ namespace WebFace.Controllers
             var img2 = new Bitmap(bmp, new Size(250, 300));
             this.imgProperties.Add("ProcessedImageSize", img2.Size.ToString());
 
+            // Create and save histograms of the image
+            SaveHistograms(img2);
+
             // Crop is not working very well...
-            img2 = ImageUtils.Crop(img2);
+            // img2 = ImageUtils.Crop(img2);
 
             // face detection
             var faces = Detect(img2, HaarFace);
@@ -119,12 +128,11 @@ namespace WebFace.Controllers
 
             foreach (var rectangle in faces)
             {
-                // g.FillRectangle(new SolidBrush(Color.FromArgb(50, 255, 0, 0)), rectangle);
-                g.DrawRectangle(new Pen(Color.FromArgb(80, 255, 0, 0), (float)2.8), rectangle);
+                g.DrawRectangle(new Pen(Color.FromArgb(80, 255, 0, 0), (float)3.8), rectangle);
             }
+
             g.Save();
        
-
             // Eye detection
             var eyes = Detect(img2, HaarEye);
 
@@ -161,19 +169,38 @@ namespace WebFace.Controllers
         /// <param name="fileName">
         /// The file name.
         /// </param>
-        [SuppressMessage("StyleCop.CSharp.LayoutRules", "SA1503:CurlyBracketsMustNotBeOmitted", Justification = "Reviewed. Suppression is OK here.")]
         private void EvaluateAndSaveImg(string fullFilePath, string fileName)
         {
-            var bmp = (Bitmap) Image.FromFile(fullFilePath);
+            var bmp = (Bitmap)Image.FromFile(fullFilePath);
 
             var img2 = new Bitmap(bmp, new Size(250, 300));
 
-            var ret = Detect(img2, HaarFace);
+            var faces = Detect(img2, HaarFace);
+            var eyes = Detect(img2, HaarEye);
 
-            if (ret.Length == 1)
+            var photoProperties = eyes.Length.ToString();
+
+            if (faces.Length == 1)
+            {
+                photoProperties = photoProperties + ", " + bmp.Height + ", " + bmp.Width + ", 1";
+
+                this.photoDict.Add(fileName, photoProperties);
                 img2.Save(Server.MapPath("~/App_Data/cleaning/clean_data/" + fileName));
-            else
+            }
+            else if (faces.Length < 1)
+            {
+                photoProperties = photoProperties + ", " + bmp.Height + ", " + bmp.Width + ", " + faces.Length;
+
+                this.photoDict.Add(fileName, photoProperties);
                 img2.Save(Server.MapPath("~/App_Data/cleaning/dirty_data/" + fileName));
+            }
+            else if (faces.Length > 1)
+            {
+                photoProperties = photoProperties + ", " + bmp.Height + ", " + bmp.Width + ", " + faces.Length;
+
+                this.photoDict.Add(fileName, photoProperties);
+                img2.Save(Server.MapPath("~/App_Data/cleaning/dirty_data/" + fileName));
+            }
         }
 
         /// <summary>
@@ -192,7 +219,6 @@ namespace WebFace.Controllers
         private Rectangle[] Detect(Bitmap bmp, string haarCascadeFile)
         {
             Image<Rgb, Byte> x = new Image<Rgb, Byte>(bmp); 
-            var img = x.Convert<Gray, Byte>();
 
             var cascadeClassifier =
                 new CascadeClassifier(Server.MapPath("~/App_Data/HaarCascade/" + haarCascadeFile));
@@ -202,9 +228,9 @@ namespace WebFace.Controllers
                 if (imageFrame != null)
                 {
                     var grayframe = imageFrame.Convert<Gray, Byte>();
-                    var faces = cascadeClassifier.DetectMultiScale(grayframe, 1.1, 10,
-                        Size.Empty); //the actual face detection happens here
-                    return faces;
+                    var detectedObject = cascadeClassifier.DetectMultiScale(grayframe, 1.1, 10,
+                        Size.Empty); // the actual face detection happens here
+                    return detectedObject;
                 }
             }
             return new Rectangle[0];
@@ -231,13 +257,13 @@ namespace WebFace.Controllers
                 this.imgProperties.Add("faceRight", face.Right);
                 this.imgProperties.Add("faceWidth", face.Width);
                 this.imgProperties.Add("faceHeight", face.Height);
+
                 // get eye positions
-                this.imgProperties.Add("eye_1_horizontal",  (eye1.Top + eye1.Bottom)/2);
+                this.imgProperties.Add("eye_1_horizontal", (eye1.Top + eye1.Bottom) / 2);
                 this.imgProperties.Add("eye_1_vertical", (eye1.Left + eye1.Right) / 2);
                 this.imgProperties.Add("eye_2_horizontal", (eye2.Top + eye2.Bottom) / 2);
                 this.imgProperties.Add("eye_2_vertical", (eye2.Left + eye2.Right) / 2);
-                this.imgProperties.Add("eyeTilt", ((eye1.Top + eye1.Bottom) / 2) - 
-                                             ((eye2.Top + eye2.Bottom) / 2));
+                this.imgProperties.Add("eyeTilt", ((eye1.Top + eye1.Bottom) / 2) - ((eye2.Top + eye2.Bottom) / 2));
         }
 
         /// <summary>
@@ -254,5 +280,18 @@ namespace WebFace.Controllers
                                                        fileName.Substring(0, fileName.Length - 4) + ".json"), json);
         }
 
+        private void SaveHistograms(Bitmap image)
+        {
+            Image<Gray, Byte> img2Blue = new Image<Rgb, byte>(image)[2];
+            Image<Gray, Byte> img2Green = new Image<Rgb, byte>(image)[1];
+            Image<Gray, Byte> img2Red = new Image<Rgb, byte>(image)[0];
+
+            var redHistogram = ImageUtils.ApplyHistogram(img2Red, new Pen(Brushes.Red));
+            redHistogram.Save(Server.MapPath("~/App_Data/processed/redHist.jpg"));
+            var greenHistogram = ImageUtils.ApplyHistogram(img2Green, new Pen(Brushes.LimeGreen));
+            greenHistogram.Save(Server.MapPath("~/App_Data/processed/greenHist.jpg"));
+            var blueHistogram = ImageUtils.ApplyHistogram(img2Blue, new Pen(Brushes.Blue));
+            blueHistogram.Save(Server.MapPath("~/App_Data/processed/blueHist.jpg"));
+        }
     }
 }

@@ -2,27 +2,38 @@
 using System.Drawing;
 using Emgu.CV;
 using Emgu.CV.Structure;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
+
 
 namespace WebFace.Controllers
 {
     public static class ImageUtils
     {
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="image"></param>
+        /// <returns>
+        /// Red, green, blue histograms
+        /// </returns>
         public static (Mat, Mat, Mat) Histogram(Image<Rgb, Byte> image)
         {
-            DenseHistogram histogram = new DenseHistogram(255, new RangeF(0, 255));
+            DenseHistogram histogram = new DenseHistogram(
+                new int[] { 256, 256, 256 },
+                new RangeF[] { new RangeF(0, 255), new RangeF(0, 255), new RangeF(0, 255) });
 
             Image<Gray, Byte> img2Blue = image[2];
             Image<Gray, Byte> img2Green = image[1];
             Image<Gray, Byte> img2Red = image[0];
 
+            int cols = histogram.Cols;
+            int dim = histogram.Dims;
+            var g = histogram.SizeOfDimemsion;
 
             histogram.Calculate(new Image<Gray, Byte>[] { img2Blue }, false, null);
             Mat blueHist = new Mat();
             histogram.CopyTo(blueHist);
             histogram.Clear();
-
+       
             histogram.Calculate(new Image<Gray, Byte>[] { img2Green }, false, null);
             Mat greenHist = new Mat();
             histogram.CopyTo(greenHist);
@@ -34,6 +45,48 @@ namespace WebFace.Controllers
             histogram.Clear();
 
             return (redHist, greenHist, blueHist);
+        }
+
+        public static Bitmap ApplyHistogram(Image<Gray, byte> imgInput, Pen pen)
+        {
+            DenseHistogram hist = new DenseHistogram(256, new RangeF(0.0f, 255f));
+            hist.Calculate(new Image<Gray, byte>[] { imgInput }, true, null);
+
+            // Get the max value of histogram
+            double minVal = 0.0;
+            double maxVal = 0.0;
+            Point minLoc = new Point();
+            Point maxLoc = new Point();
+
+            CvInvoke.MinMaxLoc(hist, ref minVal, ref maxVal, ref minLoc, ref maxLoc);
+
+            // Scale histogram
+            int width = imgInput.Size.Width;
+            int height = imgInput.Size.Height;
+            var histData = hist.GetBinValues();
+
+            Bitmap histo = DrawHistogram(maxVal, width, height, histData, pen);
+            return histo;
+        }
+
+        private static Bitmap DrawHistogram(double maxVal, int width, int height, float[] histData, Pen pen)
+        {
+            Bitmap histo = new Bitmap(width, height);
+            Graphics g = Graphics.FromImage(histo);
+            g.Clear(SystemColors.Window);
+
+            for (var i = 0; i < histData.GetLength(0); i++)
+            {
+                var val = (float)histData.GetValue(i);
+                val = (float)(val * (maxVal != 0 ? height / maxVal : 0.0));
+
+                Point s = new Point(i, height);
+                Point e = new Point(i, height - (int)val);
+
+                g.DrawLine(pen, s, e);
+            }
+
+            return histo;
         }
 
         public static Bitmap Crop(Bitmap bmp)
@@ -134,6 +187,28 @@ namespace WebFace.Controllers
                 throw new Exception(
                   string.Format("Values are topmost={0} btm={1} left={2} right={3} croppedWidth={4} croppedHeight={5}", topmost, bottommost, leftmost, rightmost, croppedWidth, croppedHeight),
                   ex);
+            }
+        }
+
+
+        public static void AverageImages()
+        {
+            using (MagickImageCollection images = new MagickImageCollection())
+            {
+                // Add the first image
+                MagickImage first = new MagickImage("Snakeware.png");
+                images.Add(first);
+
+                // Add the second image
+                MagickImage second = new MagickImage("Snakeware.png");
+                images.Add(second);
+
+                // Create an Average from both images
+                using (MagickImage result = images.Evaluate(EvaluateOperator.Mean))
+                {
+                    // Save the result
+                    result.Write("Mean.png");
+                }
             }
         }
 
