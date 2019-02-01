@@ -21,9 +21,6 @@ namespace WebFace.Controllers
     {        
         private readonly JObject imgProperties = new JObject();
 
-        public readonly string HaarFace = "haarcascade_frontalface_default.xml";
-        public readonly string HaarEye = "haarCascade_eye.xml";
-
         private string rootPath = string.Empty;
 
         protected override void Initialize(System.Web.Routing.RequestContext requestContext)
@@ -96,7 +93,7 @@ namespace WebFace.Controllers
             img2 = ImageUtils.AutoCrop(img2);
 
             // face detection
-            var faces = Detect(img2, this.rootPath + "/HaarCascade/" + HaarFace);
+            var faces = ImageUtils.Detect(img2, this.rootPath + "/HaarCascade/" + ImageUtils.HaarFace);
           
             Graphics g = Graphics.FromImage(img2);
 
@@ -108,7 +105,7 @@ namespace WebFace.Controllers
             g.Save();
        
             // Eye detection
-            var eyes = Detect(img2, this.rootPath + "/HaarCascade/" + HaarEye);
+            var eyes = ImageUtils.Detect(img2, this.rootPath + "/HaarCascade/" + ImageUtils.HaarEye);
 
             Graphics g2 = Graphics.FromImage(img2);
 
@@ -130,40 +127,6 @@ namespace WebFace.Controllers
                 // save json file
                 SaveImgProperties(fileName);
             }
-        }
-
-
-        /// <summary>
-        /// Detects objects in the image.
-        /// Objects are detected based on 'haar' file that is passed in.
-        /// </summary>
-        /// <param name="bmp">
-        /// Bitmap of image
-        /// </param>
-        /// <param name="haarCascadeFile">
-        /// The haar cascade file. (Pretrained file)
-        /// </param>
-        /// <returns>
-        /// The <see cref="Rectangle[]"/>.
-        /// </returns>
-        public Rectangle[] Detect(Bitmap bmp, string haarCascadeFile)
-        {
-            Image<Rgb, Byte> x = new Image<Rgb, Byte>(bmp);
-
-            var cascadeClassifier = new CascadeClassifier(haarCascadeFile);
-             //   new CascadeClassifier(Server.MapPath("~/App_Data/HaarCascade/" + haarCascadeFile));
-
-            using (var imageFrame = x)
-            {
-                if (imageFrame != null)
-                {
-                    var grayframe = imageFrame.Convert<Gray, Byte>();
-                    var detectedObject = cascadeClassifier.DetectMultiScale(grayframe, 1.1, 10,
-                        Size.Empty); // the actual face detection happens here
-                    return detectedObject;
-                }
-            }
-            return new Rectangle[0];
         }
 
         /// <summary>

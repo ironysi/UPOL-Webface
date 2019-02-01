@@ -18,6 +18,42 @@ namespace WebFace.Controllers
 
     public static class ImageUtils
     {
+        public static string HaarFace { get; } = "haarcascade_frontalface_default.xml";
+
+        public static string HaarEye { get; } = "haarCascade_eye.xml";
+
+        /// <summary>
+        /// Detects objects in the image.
+        /// Objects are detected based on 'haar' file that is passed in.
+        /// </summary>
+        /// <param name="bmp">
+        /// Bitmap of image
+        /// </param>
+        /// <param name="haarCascadeFile">
+        /// The haar cascade file. (Pretrained file)
+        /// </param>
+        /// <returns>
+        /// The <see cref="Rectangle[]"/>.
+        /// </returns>
+        public static Rectangle[] Detect(Bitmap bmp, string haarCascadeFile)
+        {
+            Image<Rgb, Byte> x = new Image<Rgb, Byte>(bmp);
+
+            var cascadeClassifier = new CascadeClassifier(haarCascadeFile);
+
+            using (var imageFrame = x)
+            {
+                if (imageFrame != null)
+                {
+                    var grayframe = imageFrame.Convert<Gray, Byte>();
+                    var detectedObject = cascadeClassifier.DetectMultiScale(grayframe, 1.1, 10,
+                        Size.Empty); // the actual face detection happens here
+                    return detectedObject;
+                }
+            }
+            return new Rectangle[0];
+        }
+   
         /// <summary>
         /// 
         /// </summary>

@@ -36,7 +36,7 @@ namespace WebFace.Controllers
 
         public ActionResult Histogram()
         {
-            DirectoryInfo dir = new DirectoryInfo(rootPath + "/ cleaning/clean_data/");
+            DirectoryInfo dir = new DirectoryInfo(rootPath + "/cleaning/clean_data/");
             FileInfo[] files = dir.GetFiles("*.jpg");
 
             int i = 0;
@@ -107,10 +107,8 @@ namespace WebFace.Controllers
                 var bmp = (Bitmap)Image.FromFile(Server.MapPath("~/App_Data/cleaning/dirty_data/" + file.Name));
                 var img2 = new Bitmap(bmp, new Size(250, 300));
 
-                var homeController = new HomeController();
-
                 // faces
-                var faces = homeController.Detect(img2, homeController.HaarFace);
+                var faces = ImageUtils.Detect(img2, ImageUtils.HaarFace);
 
                 Bitmap clearImg = new Bitmap(250, 300, PixelFormat.Format16bppRgb555);
                 Graphics g = Graphics.FromImage(clearImg);
@@ -122,7 +120,7 @@ namespace WebFace.Controllers
 
                 g.Save();
 
-                var eyes = homeController.Detect(img2, homeController.HaarEye);
+                var eyes = ImageUtils.Detect(img2, ImageUtils.HaarEye);
 
                 Graphics g2 = Graphics.FromImage(clearImg);
 
@@ -163,10 +161,8 @@ namespace WebFace.Controllers
 
             var img2 = new Bitmap(bmp, new Size(250, 300));
 
-            var homeController = new HomeController();
-
-            var faces = homeController.Detect(img2, this.rootPath + "/HaarCascade/" + homeController.HaarFace);
-            var eyes = homeController.Detect(img2, this.rootPath + "/HaarCascade/" + homeController.HaarEye);
+            var faces = ImageUtils.Detect(img2, this.rootPath + "/HaarCascade/" + ImageUtils.HaarFace);
+            var eyes = ImageUtils.Detect(img2, this.rootPath + "/HaarCascade/" + ImageUtils.HaarEye);
 
             var photoProperties = faces.Length + ", " + eyes.Length;
 
@@ -214,25 +210,26 @@ namespace WebFace.Controllers
             }
         }
 
-
         private void SaveHistograms(Bitmap image)
         {
-            Image<Gray, Byte> img2Blue = new Image<Rgb, byte>(image)[2];
-            Image<Gray, Byte> img2Green = new Image<Rgb, byte>(image)[1];
-            Image<Gray, Byte> img2Red = new Image<Rgb, byte>(image)[0];
+            Image<Gray, byte> img2Blue = new Image<Rgb, byte>(image)[2];
+            Image<Gray, byte> img2Green = new Image<Rgb, byte>(image)[1];
+            Image<Gray, byte> img2Red = new Image<Rgb, byte>(image)[0];
 
             var redHistogram = ImageUtils.ApplyHistogram(img2Red, new Pen(Brushes.Red));
             this.redHistograms.Add(new MagickImage(redHistogram));
+
             // redHistogram.Save(Server.MapPath("~/App_Data/processed/redHist1.jpg"));
 
             var greenHistogram = ImageUtils.ApplyHistogram(img2Green, new Pen(Brushes.LimeGreen));
             this.greenHistograms.Add(new MagickImage(greenHistogram));
+
             // greenHistogram.Save(Server.MapPath("~/App_Data/processed/greenHist1.jpg"));
 
             var blueHistogram = ImageUtils.ApplyHistogram(img2Blue, new Pen(Brushes.Blue));
             this.blueHistograms.Add(new MagickImage(blueHistogram));
+
             // blueHistogram.Save(Server.MapPath("~/App_Data/processed/blueHist1.jpg"));
         }
-
     }
 }
