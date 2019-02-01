@@ -18,56 +18,27 @@ using Newtonsoft.Json.Linq;
 namespace WebFace.Controllers
 {
     public class HomeController : Controller
-    {
-        private readonly MagickImageCollection redHistograms = new MagickImageCollection();
-        private readonly MagickImageCollection greenHistograms = new MagickImageCollection();
-        private readonly MagickImageCollection blueHistograms = new MagickImageCollection();
-
-        private readonly MagickImageCollection facesCollection = new MagickImageCollection();
-        
+    {        
         private readonly JObject imgProperties = new JObject();
-        private readonly Dictionary<string, string> photoDict = new Dictionary<string, string>();
 
-        private const string HaarFace = "haarcascade_frontalface_default.xml";
-        private const string HaarEye = "haarCascade_eye.xml";
+        public readonly string HaarFace = "haarcascade_frontalface_default.xml";
+        public readonly string HaarEye = "haarCascade_eye.xml";
 
+        private string rootPath = string.Empty;
+
+        protected override void Initialize(System.Web.Routing.RequestContext requestContext)
+        {
+            base.Initialize(requestContext);
+
+            // now Server has been initialized
+            rootPath = Server.MapPath("~/App_Data");
+        }
 
         public ActionResult Index()
         {
             return View();
         }
 
-        /// <summary>
-        /// Takes all files from "App_Data/uploads/" and sorts them into "clean_data" and "dirty_data" based on face detection. 
-        /// </summary>
-        /// <returns>
-        /// The <see cref="ActionResult"/>.
-        /// </returns>
-        public ActionResult CleanFolder()
-        {
-            DirectoryInfo dir = new DirectoryInfo(Server.MapPath("~/App_Data/"));
-            FileInfo[] files = dir.GetFiles("*.jpg");
-
-            foreach (var file in files)
-            {
-                // store the file inside ~/App_Data/uploads folder
-                var filePath = Path.Combine(
-                    Server.MapPath("~/App_Data/uploads"),
-                    file.Name ?? throw new InvalidOperationException());
-
-                // file.CopyTo(filePath, overwrite:true);
-
-                EvaluateAndSaveImg(filePath, file.Name);
-            }
-
-            var csv = string.Join(
-                Environment.NewLine,
-                this.photoDict.Select(x => x.Key + "," + x.Value));
-
-            System.IO.File.WriteAllText(Server.MapPath("~/App_Data/stats.csv"), csv);
-
-            return RedirectToAction("Index");
-        }
 
         /// <summary>
         /// The upload and process fille.
@@ -83,7 +54,7 @@ namespace WebFace.Controllers
             if (file != null && file.ContentLength > 0)
             {
                 // store the file inside ~/App_Data/uploads folder
-                var filePath = Path.Combine(Server.MapPath("~/App_Data/uploads"), file.FileName ?? throw new InvalidOperationException());
+                var filePath = Path.Combine(this.rootPath + "/uploads", file.FileName ?? throw new InvalidOperationException());
 
                 file.SaveAs(filePath);
                 // ReSharper disable once ArrangeThisQualifier
@@ -98,76 +69,6 @@ namespace WebFace.Controllers
             return RedirectToAction("Index");
         }
 
-        public ActionResult Histogram()
-        {
-            DirectoryInfo dir = new DirectoryInfo(Server.MapPath("~/App_Data/cleaning/clean_data/"));
-            FileInfo[] files = dir.GetFiles("*.jpg");
-
-            foreach (var file in files)
-            {
-                var bmp = (Bitmap)Image.FromFile(Server.MapPath("~/App_Data/cleaning/clean_data/" + file.Name));
-                var img2 = new Bitmap(bmp, new Size(250, 300));
-                SaveHistograms(img2);
-            }
-
-            this.redHistograms.Evaluate(EvaluateOperator.Mean).Write(Server.MapPath(
-                "~/App_Data/processed/redHistogramMean_positives.png"));
-            this.greenHistograms.Evaluate(EvaluateOperator.Mean).Write(Server.MapPath(
-                "~/App_Data/processed/greenHistogramMean_positives.png"));
-            this.blueHistograms.Evaluate(EvaluateOperator.Mean).Write(Server.MapPath(
-                "~/App_Data/processed/blueHistogramMean_positives.png"));
-
-            return RedirectToAction("Index");
-        }
-
-        public ActionResult SuperPosition()
-        {
-            DirectoryInfo dir = new DirectoryInfo(Server.MapPath("~/App_Data/cleaning/dirty_data/"));
-            FileInfo[] files = dir.GetFiles("*.jpg");
-
-            int i = 0;
-
-            foreach (var file in files)
-            {
-                var bmp = (Bitmap)Image.FromFile(Server.MapPath("~/App_Data/cleaning/dirty_data/" + file.Name));
-                var img2 = new Bitmap(bmp, new Size(250, 300));
-
-                // faces
-                var faces = Detect(img2, HaarFace);
-
-                Bitmap clearImg = new Bitmap(250, 300, PixelFormat.Format16bppRgb555);
-                Graphics g = Graphics.FromImage(clearImg);
-
-                foreach (var rectangle in faces)
-                {
-                    g.FillRectangle(new SolidBrush(Color.FromArgb(90, 255, 0, 0)), rectangle);
-                }
-
-                g.Save();
-
-                var eyes = Detect(img2, HaarEye);
-
-                Graphics g2 = Graphics.FromImage(clearImg);
-
-                foreach (var rectangle in eyes)
-                {
-                    g2.FillRectangle(new SolidBrush(Color.FromArgb(90, 0, 255, 0)), rectangle);
-                }
-
-                g2.Save();
-
-                this.facesCollection.Add(new MagickImage(clearImg));
-
-                i++;
-                if (i == 1000)
-                    break;
-            }
-
-            this.facesCollection.Evaluate(EvaluateOperator.Mean).Write(Server.MapPath(
-                "~/App_Data/processed/faceAndEyesSuperposition_negative.png"));
-
-            return RedirectToAction("Index");
-        }
 
         /// <summary>
         /// Applies all transformation and detection methods to given image.
@@ -178,7 +79,7 @@ namespace WebFace.Controllers
         /// </param>
         private void Convert(string fileName)
         {
-            var bmp = (Bitmap)Image.FromFile(Server.MapPath("~/App_Data/uploads/" + fileName));
+            var bmp = (Bitmap)Image.FromFile(this.rootPath + "/uploads/" + fileName);
 
             // add original img size to imgProperties json
             // ReSharper disable once ArrangeThisQualifier
@@ -195,7 +96,7 @@ namespace WebFace.Controllers
             img2 = ImageUtils.AutoCrop(img2);
 
             // face detection
-            var faces = Detect(img2, HaarFace);
+            var faces = Detect(img2, this.rootPath + "/HaarCascade/" + HaarFace);
           
             Graphics g = Graphics.FromImage(img2);
 
@@ -207,7 +108,7 @@ namespace WebFace.Controllers
             g.Save();
        
             // Eye detection
-            var eyes = Detect(img2, HaarEye);
+            var eyes = Detect(img2, this.rootPath + "/HaarCascade/" + HaarEye);
 
             Graphics g2 = Graphics.FromImage(img2);
 
@@ -221,7 +122,7 @@ namespace WebFace.Controllers
             if (faces.Length == 1 && eyes.Length == 2)
             {
                 Console.WriteLine("Picture was processed and saved.");
-                img2.Save(Server.MapPath("~/App_Data/processed/" + fileName));
+                img2.Save(this.rootPath + "/processed/" + fileName);
 
                 // get img properties
                 GetImgProperties(faces[0], eyes[0], eyes[1]);
@@ -231,50 +132,6 @@ namespace WebFace.Controllers
             }
         }
 
-        /// <summary>
-        /// Method for "cleaning" folder full of images.
-        /// Detects images that contain face and saves them to "clean_data" folder,
-        /// ones that don't will be saved to "dirty_data"
-        /// </summary>
-        /// <param name="fullFilePath">
-        /// The full file path.
-        /// </param>
-        /// <param name="fileName">
-        /// The file name.
-        /// </param>
-        private void EvaluateAndSaveImg(string fullFilePath, string fileName)
-        {
-            var bmp = (Bitmap)Image.FromFile(fullFilePath);
-
-            var img2 = new Bitmap(bmp, new Size(250, 300));
-
-            var faces = Detect(img2, HaarFace);
-            var eyes = Detect(img2, HaarEye);
-
-            var photoProperties = eyes.Length.ToString();
-
-            if (faces.Length == 1)
-            {
-                photoProperties = photoProperties + ", " + bmp.Height + ", " + bmp.Width + ", 1";
-
-                this.photoDict.Add(fileName, photoProperties);
-                img2.Save(Server.MapPath("~/App_Data/cleaning/clean_data/" + fileName));
-            }
-            else if (faces.Length < 1)
-            {
-                photoProperties = photoProperties + ", " + bmp.Height + ", " + bmp.Width + ", " + faces.Length;
-
-                this.photoDict.Add(fileName, photoProperties);
-                img2.Save(Server.MapPath("~/App_Data/cleaning/dirty_data/" + fileName));
-            }
-            else if (faces.Length > 1)
-            {
-                photoProperties = photoProperties + ", " + bmp.Height + ", " + bmp.Width + ", " + faces.Length;
-
-                this.photoDict.Add(fileName, photoProperties);
-                img2.Save(Server.MapPath("~/App_Data/cleaning/dirty_data/" + fileName));
-            }
-        }
 
         /// <summary>
         /// Detects objects in the image.
@@ -289,12 +146,12 @@ namespace WebFace.Controllers
         /// <returns>
         /// The <see cref="Rectangle[]"/>.
         /// </returns>
-        private Rectangle[] Detect(Bitmap bmp, string haarCascadeFile)
+        public Rectangle[] Detect(Bitmap bmp, string haarCascadeFile)
         {
-            Image<Rgb, Byte> x = new Image<Rgb, Byte>(bmp); 
+            Image<Rgb, Byte> x = new Image<Rgb, Byte>(bmp);
 
-            var cascadeClassifier =
-                new CascadeClassifier(Server.MapPath("~/App_Data/HaarCascade/" + haarCascadeFile));
+            var cascadeClassifier = new CascadeClassifier(haarCascadeFile);
+             //   new CascadeClassifier(Server.MapPath("~/App_Data/HaarCascade/" + haarCascadeFile));
 
             using (var imageFrame = x)
             {
@@ -336,7 +193,13 @@ namespace WebFace.Controllers
                 this.imgProperties.Add("eye_1_vertical", (eye1.Left + eye1.Right) / 2);
                 this.imgProperties.Add("eye_2_horizontal", (eye2.Top + eye2.Bottom) / 2);
                 this.imgProperties.Add("eye_2_vertical", (eye2.Left + eye2.Right) / 2);
-                this.imgProperties.Add("eyeTilt", ((eye1.Top + eye1.Bottom) / 2) - ((eye2.Top + eye2.Bottom) / 2));
+
+                Tuple<int, int> eye1Pos = new Tuple<int, int>((eye1.Top + eye1.Bottom) / 2, (eye1.Left + eye1.Right) / 2);
+                Tuple<int, int> eye2Pos = new Tuple<int, int>((eye2.Top + eye2.Bottom) / 2, (eye2.Left + eye2.Right) / 2);
+
+                double angle = Math.Atan2(Math.Abs(eye2Pos.Item1 - eye1Pos.Item1), Math.Abs(eye2Pos.Item2 - eye1Pos.Item2));
+                
+                this.imgProperties.Add("eyeTilt", Math.Round(angle * 100));
         }
 
         /// <summary>
@@ -349,27 +212,9 @@ namespace WebFace.Controllers
         {
             string json = JsonConvert.SerializeObject(this.imgProperties, Formatting.Indented);
 
-            System.IO.File.WriteAllText(Server.MapPath("~/App_Data/processed/properties_" + 
-                                                       fileName.Substring(0, fileName.Length - 4) + ".json"), json);
+            System.IO.File.WriteAllText(this.rootPath + "/processed/properties_" + 
+                                                       fileName.Substring(0, fileName.Length - 4) + ".json", json);
         }
        
-        private void SaveHistograms(Bitmap image)
-        {
-            Image<Gray, Byte> img2Blue = new Image<Rgb, byte>(image)[2];
-            Image<Gray, Byte> img2Green = new Image<Rgb, byte>(image)[1];
-            Image<Gray, Byte> img2Red = new Image<Rgb, byte>(image)[0];
-
-            var redHistogram = ImageUtils.ApplyHistogram(img2Red, new Pen(Brushes.Red));
-            this.redHistograms.Add(new MagickImage(redHistogram));
-            // redHistogram.Save(Server.MapPath("~/App_Data/processed/redHist1.jpg"));
-
-            var greenHistogram = ImageUtils.ApplyHistogram(img2Green, new Pen(Brushes.LimeGreen));
-            this.greenHistograms.Add(new MagickImage(greenHistogram));
-            // greenHistogram.Save(Server.MapPath("~/App_Data/processed/greenHist1.jpg"));
-
-            var blueHistogram = ImageUtils.ApplyHistogram(img2Blue, new Pen(Brushes.Blue));
-            this.blueHistograms.Add(new MagickImage(blueHistogram));
-            // blueHistogram.Save(Server.MapPath("~/App_Data/processed/blueHist1.jpg"));
-        }
     }
 }
