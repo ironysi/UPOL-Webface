@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 using System.Web.Mvc;
@@ -12,8 +13,6 @@ using ImageMagick;
 
 namespace WebFace.Controllers
 {
-    using System.Drawing.Imaging;
-
     public class UtilsController : Controller
     {
         private readonly MagickImageCollection redHistograms = new MagickImageCollection();
@@ -39,7 +38,7 @@ namespace WebFace.Controllers
             DirectoryInfo dir = new DirectoryInfo(rootPath + "/cleaning/clean_data/");
             FileInfo[] files = dir.GetFiles("*.jpg");
 
-            int i = 0;
+            // int i = 0;
 
             foreach (var file in files)
             {
@@ -47,9 +46,9 @@ namespace WebFace.Controllers
                 var img2 = new Bitmap(bmp, new Size(250, 300));
                 SaveHistograms(img2);
 
-                i++;
-                if (i == 100)
-                    break;
+                // i++;
+                // if (i == 100)
+                //    break;
             }
 
             this.redHistograms.Evaluate(EvaluateOperator.Mean).Write(rootPath + "/processed/redHistogramMean_positives.png");
@@ -70,7 +69,7 @@ namespace WebFace.Controllers
             DirectoryInfo dir = new DirectoryInfo(this.rootPath);
             FileInfo[] files = dir.GetFiles("*.jpg");
 
-            int i = 0;
+            // int i = 0;
 
             foreach (var file in files)
             {
@@ -81,16 +80,16 @@ namespace WebFace.Controllers
 
                 EvaluateAndSaveImg(filePath, file.Name);
 
-                i++;
-                if (i == 100)
-                    break;
+                // i++;
+                // if (i == 2000)
+                //    break;
             }
 
             var csv = string.Join(
                 Environment.NewLine,
                 this.photoDict.Select(x => x.Key + "," + x.Value));
 
-            System.IO.File.WriteAllText(rootPath + "/processed/stats_test.csv", csv);
+            System.IO.File.WriteAllText(rootPath + "/processed/stats_1000_originalSize.csv", csv);
 
             return new HttpStatusCodeResult(200);
         }
@@ -100,7 +99,7 @@ namespace WebFace.Controllers
             DirectoryInfo dir = new DirectoryInfo(Server.MapPath("~/App_Data/cleaning/dirty_data/"));
             FileInfo[] files = dir.GetFiles("*.jpg");
 
-            int i = 0;
+            // int i = 0;
 
             foreach (var file in files)
             {
@@ -133,9 +132,9 @@ namespace WebFace.Controllers
 
                 this.facesCollection.Add(new MagickImage(clearImg));
 
-                i++;
-                if (i == 100)
-                    break;
+                // i++;
+                // if (i == 100)
+                //    break;
             }
 
             this.facesCollection.Evaluate(EvaluateOperator.Mean).Write(Server.MapPath(
@@ -159,7 +158,8 @@ namespace WebFace.Controllers
         {
             var bmp = (Bitmap)Image.FromFile(fullFilePath);
 
-            var img2 = new Bitmap(bmp, new Size(250, 300));
+            // var img2 = new Bitmap(bmp, new Size(250, 300));
+            var img2 = new Bitmap(bmp);
 
             var faces = ImageUtils.Detect(img2, this.rootPath + "/HaarCascade/" + ImageUtils.HaarFace);
             var eyes = ImageUtils.Detect(img2, this.rootPath + "/HaarCascade/" + ImageUtils.HaarEye);
@@ -180,7 +180,7 @@ namespace WebFace.Controllers
                     Math.Abs(eye2Pos.Item1 - eye1Pos.Item1),
                     Math.Abs(eye2Pos.Item2 - eye1Pos.Item2));
 
-                photoProperties = photoProperties + ", " + Math.Round(angle * 100) + "°";
+                photoProperties = photoProperties + ", " + Math.Round(angle * 100);
             }
             else
             {
@@ -192,21 +192,21 @@ namespace WebFace.Controllers
                 photoProperties = photoProperties + ", " + bmp.Height + ", " + bmp.Width;
 
                 this.photoDict.Add(fileName, photoProperties);
-                img2.Save(rootPath + "/cleaning/clean_data/" + fileName);
+              // img2.Save(rootPath + "/cleaning/clean_data/" + fileName);
             }
             else if (faces.Length < 1)
             {
                 photoProperties = photoProperties + ", " + bmp.Height + ", " + bmp.Width;
 
                 this.photoDict.Add(fileName, photoProperties);
-                img2.Save(rootPath + "/cleaning/dirty_data/" + fileName);
+               // img2.Save(rootPath + "/cleaning/dirty_data/" + fileName);
             }
             else if (faces.Length > 1)
             {
                 photoProperties = photoProperties + ", " + bmp.Height + ", " + bmp.Width;
 
                 this.photoDict.Add(fileName, photoProperties);
-                img2.Save(rootPath + "/cleaning/dirty_data/" + fileName);
+               // img2.Save(rootPath + "/cleaning/dirty_data/" + fileName);
             }
         }
 

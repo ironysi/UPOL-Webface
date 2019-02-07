@@ -35,8 +35,7 @@ namespace WebFace.Controllers
         {
             return View();
         }
-
-
+        
         /// <summary>
         /// The upload and process fille.
         /// </summary>
@@ -66,7 +65,6 @@ namespace WebFace.Controllers
             return RedirectToAction("Index");
         }
 
-
         /// <summary>
         /// Applies all transformation and detection methods to given image.
         /// Saves image to 'processed' folder.
@@ -85,12 +83,9 @@ namespace WebFace.Controllers
             var img2 = new Bitmap(bmp, new Size(250, 300));
             this.imgProperties.Add("ProcessedImageSize", img2.Size.ToString());
 
-            // Create and save histograms of the image
-            // SaveHistograms(img2);
-
             // Crop is not working very well...
             // img2 = ImageUtils.Crop(img2);
-            img2 = ImageUtils.AutoCrop(img2);
+            // img2 = ImageUtils.AutoCrop(img2);
 
             // face detection
             var faces = ImageUtils.Detect(img2, this.rootPath + "/HaarCascade/" + ImageUtils.HaarFace);
@@ -178,6 +173,5 @@ namespace WebFace.Controllers
             System.IO.File.WriteAllText(this.rootPath + "/processed/properties_" + 
                                                        fileName.Substring(0, fileName.Length - 4) + ".json", json);
         }
-       
     }
 }

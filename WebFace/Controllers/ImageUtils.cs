@@ -1,21 +1,16 @@
 ﻿using System;
 using System.Drawing;
+using System.Drawing.Imaging;
+using System.Linq;
+
+using AForge.Imaging;
+using AForge.Imaging.Filters;
+
 using Emgu.CV;
 using Emgu.CV.Structure;
 
-
 namespace WebFace.Controllers
 {
-    using System.Drawing.Imaging;
-    using System.Linq;
-
-    using AForge.Imaging;
-    using AForge.Imaging.Filters;
-
-    using ImageMagick;
-
-    using Image = System.Drawing.Image;
-
     public static class ImageUtils
     {
         public static string HaarFace { get; } = "haarcascade_frontalface_default.xml";
@@ -52,45 +47,6 @@ namespace WebFace.Controllers
                 }
             }
             return new Rectangle[0];
-        }
-   
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="image"></param>
-        /// <returns>
-        /// Red, green, blue histograms
-        /// </returns>
-        public static (Mat, Mat, Mat) Histogram(Image<Rgb, Byte> image)
-        {
-            DenseHistogram histogram = new DenseHistogram(
-                new int[] { 256, 256, 256 },
-                new RangeF[] { new RangeF(0, 255), new RangeF(0, 255), new RangeF(0, 255) });
-
-            Image<Gray, Byte> img2Blue = image[2];
-            Image<Gray, Byte> img2Green = image[1];
-            Image<Gray, Byte> img2Red = image[0];
-
-            int cols = histogram.Cols;
-            int dim = histogram.Dims;
-            var g = histogram.SizeOfDimemsion;
-
-            histogram.Calculate(new Image<Gray, Byte>[] { img2Blue }, false, null);
-            Mat blueHist = new Mat();
-            histogram.CopyTo(blueHist);
-            histogram.Clear();
-       
-            histogram.Calculate(new Image<Gray, Byte>[] { img2Green }, false, null);
-            Mat greenHist = new Mat();
-            histogram.CopyTo(greenHist);
-            histogram.Clear();
-
-            histogram.Calculate(new Image<Gray, Byte>[] { img2Red }, false, null);
-            Mat redHist = new Mat();
-            histogram.CopyTo(redHist);
-            histogram.Clear();
-
-            return (redHist, greenHist, blueHist);
         }
 
         public static Bitmap ApplyHistogram(Image<Gray, byte> imgInput, Pen pen)
