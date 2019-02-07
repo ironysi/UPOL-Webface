@@ -35,14 +35,14 @@ namespace WebFace.Controllers
 
         public ActionResult Histogram()
         {
-            DirectoryInfo dir = new DirectoryInfo(rootPath + "/cleaning/clean_data/");
+            DirectoryInfo dir = new DirectoryInfo(rootPath + "/cleaning/dirty_data/");
             FileInfo[] files = dir.GetFiles("*.jpg");
 
             // int i = 0;
 
             foreach (var file in files)
             {
-                var bmp = (Bitmap)Image.FromFile(rootPath + "/cleaning/clean_data/" + file.Name);
+                var bmp = (Bitmap)Image.FromFile(rootPath + "/cleaning/dirty_data/" + file.Name);
                 var img2 = new Bitmap(bmp, new Size(250, 300));
                 SaveHistograms(img2);
 
@@ -51,9 +51,9 @@ namespace WebFace.Controllers
                 //    break;
             }
 
-            this.redHistograms.Evaluate(EvaluateOperator.Mean).Write(rootPath + "/processed/redHistogramMean_positives.png");
-            this.greenHistograms.Evaluate(EvaluateOperator.Mean).Write(rootPath + "/processed/greenHistogramMean_positives.png");
-            this.blueHistograms.Evaluate(EvaluateOperator.Mean).Write(rootPath + "/processed/blueHistogramMean_positives.png");
+            this.redHistograms.Evaluate(EvaluateOperator.Mean).Write(rootPath + "/processed/redHistogramMean_negatives.png");
+            this.greenHistograms.Evaluate(EvaluateOperator.Mean).Write(rootPath + "/processed/greenHistogramMean_negatives.png");
+            this.blueHistograms.Evaluate(EvaluateOperator.Mean).Write(rootPath + "/processed/blueHistogramMean_negatives.png");
 
             return new HttpStatusCodeResult(200);
         }
