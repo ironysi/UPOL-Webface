@@ -1,16 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Drawing;
-using System.Drawing.Imaging;
 using System.IO;
-using System.Linq;
 using System.Web;
 using System.Web.Mvc;
-
-using Emgu.CV;
-using Emgu.CV.Structure;
-
-using ImageMagick;
 
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -37,7 +29,7 @@ namespace WebFace.Controllers
         }
         
         /// <summary>
-        /// The upload and process fille.
+        /// The upload and process file.
         /// </summary>
         /// <param name="file">
         /// The file.
