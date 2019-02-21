@@ -1,0 +1,152 @@
+﻿@{ Layout = null;}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>UPOL WebFace</title>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.0.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropit/0.5.1/jquery.cropit.min.js"></script>
+
+    <style>
+        td {
+            border: 1px solid black;
+            text-align: center;
+        }
+        table {
+            width: 100%;
+        }
+
+        .cropit-preview {
+            background-color: #f8f8f8;
+            -ms-background-size: cover;
+            background-size: cover;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            margin-top: 7px;
+            width: 250px;
+            height: 300px;
+        }
+
+        #processed-image {
+            background-color: #f8f8f8;
+            -ms-background-size: cover;
+            background-size: cover;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            margin-top: 7px;
+            width: 250px;
+            height: 300px;
+        }
+
+        .cropit-preview-image-container {
+            cursor: move;
+        }
+        /*
+         * If the slider or anything else is covered by the background image,
+         * use relative or absolute position on it
+        */
+
+        .image-size-label {
+            margin-top: 10px;
+        }
+
+        input {
+            display: block;
+        }
+
+        button[type="submit"] {
+            margin-top: 10px;
+        }
+
+        #result {
+            margin-top: 10px;
+            width: 900px;
+        }
+
+        #result-data {
+            display: block;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            word-wrap: break-word;
+        }
+
+        /* Three image containers (use 25% for four, and 50% for two, etc) */
+        .column {
+            float: left;
+            width: 250px;
+            padding: 5px;
+        }
+
+        /* Clear floats after image containers */
+        .row:after {
+            content: "";
+            clear: both;
+            display: table;
+        }
+    </style>
+</head>
+<body>
+    <div class="image-editor">
+        <form id="login-form">
+            <input type="file" name="image" class="cropit-image-input" />
+            <div class="row">
+                <div class="column cropit-preview"></div>
+                <div class="column" id="processed-image"><img id="img-processed" src="" /></div>
+            </div>
+            <div class="image-size-label">
+                Resize image
+            </div>
+            <input type="range" class="cropit-image-zoom-input" />
+            <input type="hidden" name="image-data" class="hidden-image-data" />
+        </form>
+
+        <button type="button" id="submitForm" onclick="onSubmitClick()">Submit</button>
+        <button type="button" id="refresh">Show Detected Objects</button>
+    </div>
+
+    <div id="result">
+        <p id="json_data"></p>
+    </div>
+
+    <script>
+        $('.image-editor').cropit({
+            maxZoom: 2.0
+        });
+
+        $("#refresh").click(function () {
+            var fileName = $('input[type=file]').val().replace(/C:\\fakepath\\/i, '');
+
+            getImg(fileName);
+        });
+
+        function onSubmitClick() {
+            var image = $('.image-editor').cropit('export',
+                {
+                    type: 'image/jpeg',
+                    quality: 1.0
+                });
+
+            var fileName = $('input[type=file]').val().replace(/C:\\fakepath\\/i, '');
+
+            $.post("@Url.Action("UploadImage", "Images")",
+                { image: image, fileName: fileName },
+                function (jsonData) {
+
+                    var jsonTxt = JSON.stringify(jsonData).replace(/\\/g, "");
+
+                    $("#json_data").text(jsonTxt);
+                });
+        }
+
+        function getImg(fileName) {
+            $.get("@Url.Action("GetImage", "Images")",
+            { fileName: fileName },
+            function (base64Data) {
+
+                $("#img-processed").attr("src", "data:image/png;base64," + base64Data.base64image);
+            });
+        }
+    </script>
+</body>
+</html>

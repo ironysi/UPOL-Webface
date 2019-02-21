@@ -29,19 +29,21 @@ namespace WebFace.Controllers
         }
         
         /// <summary>
-        /// The upload and process file.
+        /// The upload and process image.
         /// </summary>
         /// <param name="file">
-        /// The file.
+        /// The image.
         /// </param>
         /// <returns>
         /// The <see cref="ActionResult"/>.
         /// </returns>
+        ///
+        /// localhost/home/UploadAndProcess
         public ActionResult UploadAndProcess(HttpPostedFileBase file)
         {
             if (file != null && file.ContentLength > 0)
             {
-                // store the file inside ~/App_Data/uploads folder
+                // store the image inside ~/App_Data/uploads folder
                 var filePath = Path.Combine(this.rootPath + "/uploads", file.FileName ?? throw new InvalidOperationException());
 
                 file.SaveAs(filePath);
@@ -57,12 +59,46 @@ namespace WebFace.Controllers
             return RedirectToAction("Index");
         }
 
+
+        public ActionResult UploadAndProcessImage(string image, string fileName)
+        {
+            if (!string.IsNullOrEmpty(image))
+            {
+                image = image.Replace("data:image/png;base64,", String.Empty);
+
+                image = image.Replace("data:image/jpeg;base64,", String.Empty);
+
+                image = image.Replace('-', '+');
+
+                image = image.Replace('_', '/');
+
+                Byte[] imageBytes = System.Convert.FromBase64String(image);
+
+                Image img = (Bitmap)((new ImageConverter()).ConvertFrom(imageBytes));
+
+
+                // store the image inside ~/App_Data/uploads folder
+                var filePath = Path.Combine(this.rootPath + "/uploads", fileName ?? throw new InvalidOperationException());
+
+                // '?' is checking for null
+                img?.Save(filePath);
+
+                Convert(fileName);
+            }
+            else
+            {
+                Console.WriteLine("Upload error!");
+            }           
+
+            return RedirectToAction("Index");
+        }
+
         /// <summary>
         /// Applies all transformation and detection methods to given image.
         /// Saves image to 'processed' folder.
         /// </summary>
         /// <param name="fileName">
-        /// The image file name.
+        /// The image image name.
         /// </param>
         private void Convert(string fileName)
         {
@@ -111,7 +147,7 @@ namespace WebFace.Controllers
                 // get img properties
                 GetImgProperties(faces[0], eyes[0], eyes[1]);
                 
-                // save json file
+                // save json image
                 SaveImgProperties(fileName);
             }
         }
@@ -153,7 +189,7 @@ namespace WebFace.Controllers
         }
 
         /// <summary>
-        /// Saves properties of image to the 'filename'.json file.
+        /// Saves properties of image to the 'filename'.json image.
         /// </summary>
         /// <param name="fileName">
         /// Filename of the picture.

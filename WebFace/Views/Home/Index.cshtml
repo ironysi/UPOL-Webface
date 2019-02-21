@@ -1,44 +1,103 @@
-﻿@{
-    ViewBag.Title = "Home Page";
-}
+﻿@{ Layout = null;}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>UPOL WebFace</title>
 
-<div class="jumbotron">
-    <h1>ASP.NET</h1>
-    <p class="lead">ASP.NET is a free web framework for building great Web sites and Web applications using HTML, CSS and JavaScript.</p>
-    <p><a href="https://asp.net" class="btn btn-primary btn-lg">Learn more &raquo;</a></p>
-</div>
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/2.0.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropit/0.5.1/jquery.cropit.min.js"></script>
 
-<div class="row">
-    <div class="col-md-4">
-        <h2>Getting started</h2>
-        <p>
-            ASP.NET MVC gives you a powerful, patterns-based way to build dynamic websites that
-            enables a clean separation of concerns and gives you full control over markup
-            for enjoyable, agile development.
-        </p>
-        <p><a class="btn btn-default" href="https://go.microsoft.com/fwlink/?LinkId=301865">Learn more &raquo;</a></p>
+    <style>
+        .cropit-preview {
+            background-color: #f8f8f8;
+            background-size: cover;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            margin-top: 7px;
+            width: 250px;
+            height: 300px;
+        }
+
+        .cropit-preview-image-container {
+            cursor: move;
+        }
+        /*
+         * If the slider or anything else is covered by the background image,
+         * use relative or absolute position on it
+        */
+
+        .image-size-label {
+            margin-top: 10px;
+        }
+
+        input {
+            display: block;
+        }
+
+        button[type="submit"] {
+            margin-top: 10px;
+        }
+
+        #result {
+            margin-top: 10px;
+            width: 900px;
+        }
+
+        #result-data {
+            display: block;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <div class="image-editor">
+        @*@using (Html.BeginForm("UploadAndProcess", "Home", FormMethod.Post,
+            new { name = "myForm", enctype = "multipart/form-data" }))
+        {*@
+        <form id="login-form">
+            <input type="file" name="image" class="cropit-image-input" />
+            <div class="cropit-preview"></div>
+            <div class="image-size-label">
+                Resize image
+            </div>
+            <input type="range" class="cropit-image-zoom-input" />
+            <input type="hidden" name="image-data" class="hidden-image-data" />
+        </form> 
+
+        <button type="button" id="submitForm" onclick="onSubmitClick()">Submit</button>
+        @*}*@
     </div>
-    <div class="col-md-4">
-        <h2>Get more libraries</h2>
-        <p>NuGet is a free Visual Studio extension that makes it easy to add, remove, and update libraries and tools in Visual Studio projects.</p>
-        <p><a class="btn btn-default" href="https://go.microsoft.com/fwlink/?LinkId=301866">Learn more &raquo;</a></p>
-    </div>
-    <div class="col-md-4">
-        <h2>Web Hosting</h2>
-        <p>You can easily find a web hosting company that offers the right mix of features and price for your applications.</p>
-        <p><a class="btn btn-default" href="https://go.microsoft.com/fwlink/?LinkId=301867">Learn more &raquo;</a></p>
+
+    <div id="result">
+        <code id="result-data"></code>
     </div>
 
+    <script>
 
-    @Html.BeginForm("UploadAndProcess", "Home", FormMethod.Post, new { enctype = "multipart/form-data" })){
+        // do it via fetch request
 
-    <input type="file" name="file" />
+        $('.image-editor').cropit({
+            maxZoom: 2.0
+        });
+
+        function onSubmitClick() {
+            var image = $('.image-editor').cropit('export',
+                {
+                    type: 'image/jpeg',
+                    quality: 1.0
+                });
+
+            var fileName = $('input[type=file]').val().replace(/C:\\fakepath\\/i, '')
 
 
-    <input type="submit" value="Upload" />
+            console.log(fileName);
 
-    }
-    
-
-
-</div>
+            $.post("@Url.Action("UploadAndProcessImage", "home")",
+                { image: image, fileName: fileName });
+        }
+    </script>
+</body>
+</html>
