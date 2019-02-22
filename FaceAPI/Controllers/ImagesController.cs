@@ -12,6 +12,8 @@ using Newtonsoft.Json.Linq;
 
 namespace FaceAPI.Controllers
 {
+    using System.Web.Hosting;
+
     public class ImagesController : Controller
     {
         [JsonProperty]
@@ -20,15 +22,15 @@ namespace FaceAPI.Controllers
         private string haarFace = @"App_Data/haarcascade_frontalface_default.xml";
         private string haarEye = @"App_Data/haarcascade_eye.xml";
         private string rootPath = string.Empty;
-     
+
         protected override void Initialize(System.Web.Routing.RequestContext requestContext)
         {
             base.Initialize(requestContext);
-
-            // now Server has been initialized
-            this.rootPath = Server.MapPath("~/App_Data");
-            this.haarFace = Server.MapPath("~/App_Data/haarcascade_frontalface_default.xml");
-            this.haarEye = Server.MapPath("~/App_Data/haarcascade_eye1.xml");
+            
+                // now Server has been initialized
+            this.rootPath = HostingEnvironment.MapPath("~/App_Data");
+            this.haarFace = HostingEnvironment.MapPath("~/App_Data/haarcascade_frontalface_default.xml");
+            this.haarEye = HostingEnvironment.MapPath("~/App_Data/haarcascade_eye1.xml");
         }
 
         public ActionResult Index()
@@ -46,10 +48,17 @@ namespace FaceAPI.Controllers
             string[] validExtensions = { ".jpg", ".png" };
 
             if (string.IsNullOrEmpty(image))
+            {
+                WriteToLog("UploadImage() - Image is null or empty.");
                 return new HttpStatusCodeResult(400);
+            }
+
 
             if (!validExtensions.Contains(Path.GetExtension(filePath)))
+            {
+                WriteToLog("UploadImage() - File extension not supported. Supported extensions: .png, .jpg");
                 return new HttpStatusCodeResult(415);
+            }   
 
             image = image.Replace("data:image/png;base64,", String.Empty);
             image = image.Replace("data:image/jpeg;base64,", String.Empty);
@@ -64,8 +73,15 @@ namespace FaceAPI.Controllers
             var img2 = new Bitmap((Bitmap)img ?? throw new InvalidOperationException(),
                 new Size(250, 300));
 
-            // '?' is checking for null
-            img2.Save(filePath);
+            try
+            {
+                img2.Save(filePath);
+            }
+            catch
+            {
+                WriteToLog("UploadImage() - Could not save the file");
+                return new HttpStatusCodeResult(500);
+            }
 
             var faces = Detect(img2, this.haarFace);
             var eyes = Detect(img2, this.haarEye);
@@ -82,14 +98,23 @@ namespace FaceAPI.Controllers
         public ActionResult GetImage(string fileName)
         {
             if (string.IsNullOrEmpty(fileName))
+            {
+                WriteToLog("GetImage() - File is null or empty");
                 return new HttpStatusCodeResult(400);
+            }
+            
+            if (!new[] { ".jpg", ".png" }.Contains(Path.GetExtension(fileName)))
+            {
+                WriteToLog("GetImage() - File extension not supported. Supported extensions: .png, .jpg");
+                return new HttpStatusCodeResult(415);
+            }
 
-            if (IsFileLocked(new FileInfo(Path.Combine(this.rootPath, "Uploads", fileName))))
-                return new HttpStatusCodeResult(500);
+            //if (IsFileLocked(new FileInfo(Path.Combine(this.rootPath, "Uploads", fileName))))
+            //    return new HttpStatusCodeResult(500);
 
-            Convert(fileName);
+            this.DrawObjects(fileName);
 
-            var path = Server.MapPath(Path.Combine("/App_data/Processed", fileName));
+            var path = Path.Combine(this.rootPath, "Processed", fileName);
 
             FileStream fileStream = new FileStream(path, FileMode.Open, FileAccess.Read);
             byte[] data = new byte[(int)fileStream.Length];
@@ -108,9 +133,9 @@ namespace FaceAPI.Controllers
         /// <param name="fileName">
         /// The image image name.
         /// </param>
-        private void Convert(string fileName)
+        private void DrawObjects(string fileName)
         {
-            var bmp = (Bitmap)Image.FromFile(this.rootPath + "/uploads/" + fileName);
+            var bmp = (Bitmap)Image.FromFile(Path.Combine(this.rootPath, "Uploads", fileName));
 
             this.imgProperties.Add("OriginalImageSize", bmp.Size.ToString());
 
@@ -141,7 +166,6 @@ namespace FaceAPI.Controllers
 
             g2.Save();
 
-            Console.WriteLine("Picture was processed and saved.");
             img2.Save(this.rootPath + "/processed/" + fileName);
 
             // get img properties
@@ -149,9 +173,6 @@ namespace FaceAPI.Controllers
                 GetImgProperties(faces[0], eyes[0], eyes[1]);
             else
                 GetImgProperties(faces, eyes);
-
-            // save json image
-            //SaveImgProperties(fileName);
         }
 
         /// <summary>
@@ -210,20 +231,6 @@ namespace FaceAPI.Controllers
         }
 
         /// <summary>
-        /// Saves properties of image to the 'filename'.json image.
-        /// </summary>
-        /// <param name="fileName">
-        /// Filename of the picture.
-        /// </param>
-        private void SaveImgProperties(string fileName)
-        {
-            string json = JsonConvert.SerializeObject(this.imgProperties, Formatting.Indented);
-
-            System.IO.File.WriteAllText(this.rootPath + "/processed/properties_" +
-                                                       fileName.Substring(0, fileName.Length - 4) + ".json", json);
-        }
-
-        /// <summary>
         /// Detects objects in the image.
         /// Objects are detected based on 'haar' image that is passed in.
         /// </summary>
@@ -275,6 +282,36 @@ namespace FaceAPI.Controllers
 
             //file is not locked
             return false;
+        }
+
+        private void WriteToLog(string message)
+        {
+            try
+            {
+                using (StreamWriter file = new StreamWriter(Path.Combine(this.rootPath, "log.txt"), true))
+                {
+                    file.WriteLine(DateTime.Now.TimeOfDay + "\t" + message);
+                    file.Close();
+                }
+            }
+            catch (Exception e)
+            {
+                throw;
+            }
+        }
+
+        private void ClearFolder(string path)
+        {
+            DirectoryInfo folder = new DirectoryInfo(path);
+
+            foreach (FileInfo file in folder.GetFiles())
+            {
+                file.Delete();
+            }
+            foreach (DirectoryInfo dir in folder.GetDirectories())
+            {
+                dir.Delete(true);
+            }
         }
     }
 }

@@ -102,7 +102,6 @@
         </form>
 
         <button type="button" id="submitForm" onclick="onSubmitClick()">Submit</button>
-        <button type="button" id="refresh">Show Detected Objects</button>
     </div>
 
     <div id="result">
@@ -112,12 +111,6 @@
     <script>
         $('.image-editor').cropit({
             maxZoom: 2.0
-        });
-
-        $("#refresh").click(function () {
-            var fileName = $('input[type=file]').val().replace(/C:\\fakepath\\/i, '');
-
-            getImg(fileName);
         });
 
         function onSubmitClick() {
@@ -136,6 +129,8 @@
                     var jsonTxt = JSON.stringify(jsonData).replace(/\\/g, "");
 
                     $("#json_data").text(jsonTxt);
+
+                    getImg(fileName);
                 });
         }
 
