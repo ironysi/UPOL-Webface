@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Drawing;
+using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
+using System.Web.Hosting;
 using System.Web.Mvc;
 
 using Emgu.CV;
@@ -12,26 +14,19 @@ using Newtonsoft.Json.Linq;
 
 namespace FaceAPI.Controllers
 {
-    using System.Web.Hosting;
+    using System.Web.Http;
 
     public class ImagesController : Controller
     {
         [JsonProperty]
         private readonly JObject imgProperties = new JObject();
 
-        private string haarFace = @"App_Data/haarcascade_frontalface_default.xml";
-        private string haarEye = @"App_Data/haarcascade_eye.xml";
-        private string rootPath = string.Empty;
+        private readonly string[] allowedFormats = { ".jpg", ".jpeg", ".png", ".gif" };
 
-        protected override void Initialize(System.Web.Routing.RequestContext requestContext)
-        {
-            base.Initialize(requestContext);
-            
-                // now Server has been initialized
-            this.rootPath = HostingEnvironment.MapPath("~/App_Data");
-            this.haarFace = HostingEnvironment.MapPath("~/App_Data/haarcascade_frontalface_default.xml");
-            this.haarEye = HostingEnvironment.MapPath("~/App_Data/haarcascade_eye1.xml");
-        }
+        private readonly double averageUpperX = (49 / 2.5) / 100;
+        private readonly double averageUpperY = (67 / 3.0) / 100;
+        private readonly double averageLowerX = ((49 + 150) / 2.5) / 100;
+        private readonly double averageLowerY = ((67 + 150) / 3.0) / 100;
 
         public ActionResult Index()
         {
@@ -39,113 +34,106 @@ namespace FaceAPI.Controllers
         }
 
 
-        // POST api/images/uploadImage 
-        [HttpPost]
-        public ActionResult UploadImage(string image, string fileName)
+        // POST images/uploadImage 
+        [System.Web.Mvc.HttpPost]
+        public ActionResult UploadImage(string base64Image, string fileName)
         {
-            var filePath = Path.Combine(this.rootPath, "Uploads", fileName);
-            bool isOk = false;
-            string[] validExtensions = { ".jpg", ".png" };
-
-            if (string.IsNullOrEmpty(image))
+            if (string.IsNullOrEmpty(base64Image) || string.IsNullOrEmpty(base64Image))
             {
                 WriteToLog("UploadImage() - Image is null or empty.");
                 return new HttpStatusCodeResult(400);
             }
 
-
-            if (!validExtensions.Contains(Path.GetExtension(filePath)))
+            if (!allowedFormats.Contains(Path.GetExtension(fileName)))
             {
-                WriteToLog("UploadImage() - File extension not supported. Supported extensions: .png, .jpg");
+                WriteToLog("UploadImage() - File extension not supported. Supported extensions: " 
+                           + this.allowedFormats);
                 return new HttpStatusCodeResult(415);
-            }   
+            }
 
-            image = image.Replace("data:image/png;base64,", String.Empty);
-            image = image.Replace("data:image/jpeg;base64,", String.Empty);
+            Bitmap img = Base64ToBitmap(base64Image);
 
-            image = image.Replace('-', '+');
-            image = image.Replace('_', '/');
+            var faces = Detect(img, ImageUtils.HaarFace);
+            var eyes = Detect(img, ImageUtils.HaarEye);
 
-            Byte[] imageBytes = System.Convert.FromBase64String(image);
+            if (faces.Length == 1 && eyes.Length == 2)
+            {
+                this.imgProperties.Add("imgScore", CalculateScore(faces[0]));
+                GetImgProperties(faces[0], eyes[0], eyes[1]);
+            }
+            else if (faces.Length == 1) 
+            {
+                this.imgProperties.Add("imgScore", CalculateScore(faces[0]));
+                GetImgProperties(faces, eyes);
+            }
+            else
+            {
+                this.imgProperties.Add("imgScore", 0.0);
+                GetImgProperties(faces, eyes);
+            }
+
+            Bitmap image = Base64ToBitmap(base64Image);
+
+            this.DrawObjects(image, faces, eyes);
+
+            MemoryStream ms = new MemoryStream();
+            image.Save(ms, ImageFormat.Jpeg);
+            byte[] byteImage = ms.ToArray();
+
+            var processedImage = Convert.ToBase64String(byteImage);
+
+            return Json(
+                new { properties = JsonConvert.SerializeObject(this.imgProperties), processedImage });
+        }
+
+        private Bitmap Base64ToBitmap(string base64Img)
+        {
+            base64Img = base64Img.Replace("data:image/png;base64,", String.Empty);
+            base64Img = base64Img.Replace("data:image/jpeg;base64,", String.Empty);
+
+            base64Img = base64Img.Replace('-', '+');
+            base64Img = base64Img.Replace('_', '/');
+
+            Byte[] imageBytes = System.Convert.FromBase64String(base64Img);
 
             Image img = (Bitmap)new ImageConverter().ConvertFrom(imageBytes);
 
             var img2 = new Bitmap((Bitmap)img ?? throw new InvalidOperationException(),
                 new Size(250, 300));
 
-            try
-            {
-                img2.Save(filePath);
-            }
-            catch
-            {
-                WriteToLog("UploadImage() - Could not save the file");
-                return new HttpStatusCodeResult(500);
-            }
-
-            var faces = Detect(img2, this.haarFace);
-            var eyes = Detect(img2, this.haarEye);
-
-            if (faces.Length == 1 && eyes.Length == 2)
-                GetImgProperties(faces[0], eyes[0], eyes[1]);
-            else
-                GetImgProperties(faces, eyes);
-
-           return Json(JsonConvert.SerializeObject(this.imgProperties));
+            return img2;
         }
 
-        [HttpGet]
-        public ActionResult GetImage(string fileName)
+        private double CalculateScore(Rectangle face)
         {
-            if (string.IsNullOrEmpty(fileName))
-            {
-                WriteToLog("GetImage() - File is null or empty");
-                return new HttpStatusCodeResult(400);
-            }
-            
-            if (!new[] { ".jpg", ".png" }.Contains(Path.GetExtension(fileName)))
-            {
-                WriteToLog("GetImage() - File extension not supported. Supported extensions: .png, .jpg");
-                return new HttpStatusCodeResult(415);
-            }
+            var upperXDelta = Math.Abs(((face.X / 2.5) / 100) - this.averageUpperX);
+            var upperYDelta = Math.Abs(((face.Y / 3.0) / 100) - this.averageUpperY);
+            var lowerXDelta = Math.Abs((((face.X + face.Width) / 2.5) / 100) - this.averageLowerX);
+            var lowerYDelta = Math.Abs((((face.Y + face.Height) / 3.0) / 100) - this.averageLowerY);
 
-            //if (IsFileLocked(new FileInfo(Path.Combine(this.rootPath, "Uploads", fileName))))
-            //    return new HttpStatusCodeResult(500);
+            var k = (1 - Math.Sqrt(upperXDelta));
+            var p = 1 - Math.Sqrt(upperYDelta);
+            var l = (1 - Math.Sqrt(lowerXDelta));
+            var m = (1 - Math.Sqrt(lowerYDelta));
 
-            this.DrawObjects(fileName);
-
-            var path = Path.Combine(this.rootPath, "Processed", fileName);
-
-            FileStream fileStream = new FileStream(path, FileMode.Open, FileAccess.Read);
-            byte[] data = new byte[(int)fileStream.Length];
-
-            fileStream.Read(data, 0, data.Length);
-
-
-            return Json(new { base64image = System.Convert.ToBase64String(data) }, JsonRequestBehavior.AllowGet);
+            var output = (1 - Math.Sqrt(upperXDelta)) * (1 - Math.Sqrt(upperYDelta)) * (1 - Math.Sqrt(lowerXDelta))
+                   * (1 - Math.Sqrt(lowerYDelta));
+            return output;
         }
-
 
         /// <summary>
-        /// Applies all transformation and detection methods to given image.
-        /// Saves image to 'processed' folder.
+        /// Applies all transformation and detection methods to given base64Image.
+        /// Saves base64Image to 'processed' folder.
         /// </summary>
-        /// <param name="fileName">
-        /// The image image name.
+        /// <param name="image">
+        /// The base64Image.
         /// </param>
-        private void DrawObjects(string fileName)
+        private void DrawObjects(Bitmap image)
         {
-            var bmp = (Bitmap)Image.FromFile(Path.Combine(this.rootPath, "Uploads", fileName));
-
-            this.imgProperties.Add("OriginalImageSize", bmp.Size.ToString());
-
-            var img2 = new Bitmap(bmp, new Size(250, 300));
-            this.imgProperties.Add("ProcessedImageSize", img2.Size.ToString());
-
             // face detection
-            var faces = Detect(img2, haarFace);
+            var faces = Detect(image, ImageUtils.HaarFace);
 
-            Graphics g = Graphics.FromImage(img2);
+            Graphics g = Graphics.FromImage(image);
 
             foreach (var rectangle in faces)
             {
@@ -155,9 +143,31 @@ namespace FaceAPI.Controllers
             g.Save();
 
             // Eye detection
-            var eyes = Detect(img2, haarEye);
+            var eyes = Detect(image, ImageUtils.HaarEye);
 
-            Graphics g2 = Graphics.FromImage(img2);
+            Graphics g2 = Graphics.FromImage(image);
+
+            foreach (var rectangle in eyes)
+            {
+                g2.FillRectangle(new SolidBrush(Color.FromArgb(50, 0, 255, 0)), rectangle);
+            }
+            g2.Save();
+        }
+
+        private void DrawObjects(Bitmap image, Rectangle[] faces, Rectangle[] eyes)
+        {
+            // face detection
+            Graphics g = Graphics.FromImage(image);
+
+            foreach (var rectangle in faces)
+            {
+                g.DrawRectangle(new Pen(Color.FromArgb(80, 255, 0, 0), (float)3.8), rectangle);
+            }
+
+            g.Save();
+
+            // Eye detection
+            Graphics g2 = Graphics.FromImage(image);
 
             foreach (var rectangle in eyes)
             {
@@ -165,18 +175,10 @@ namespace FaceAPI.Controllers
             }
 
             g2.Save();
-
-            img2.Save(this.rootPath + "/processed/" + fileName);
-
-            // get img properties
-            if(faces.Length == 1 && eyes.Length == 2)
-                GetImgProperties(faces[0], eyes[0], eyes[1]);
-            else
-                GetImgProperties(faces, eyes);
         }
 
         /// <summary>
-        /// Fills json object with properties of image.
+        /// Fills json object with properties of base64Image.
         /// </summary>
         /// <param name="face">
         /// The face.
@@ -231,17 +233,20 @@ namespace FaceAPI.Controllers
         }
 
         /// <summary>
-        /// Detects objects in the image.
-        /// Objects are detected based on 'haar' image that is passed in.
+        /// Detects objects in the base64Image.
+        /// Objects are detected based on 'haar' base64Image that is passed in.
         /// </summary>
         /// <param name="bmp">
-        /// Bitmap of image
+        /// Bitmap of base64Image
         /// </param>
         /// <param name="haarCascadeFile">
-        /// The haar cascade image. (Pretrained image)
+        /// The haar cascade base64Image. (Pretrained base64Image)
         /// </param>
         /// <returns>
-        /// The <see cref="Rectangle[]"/>.
+        /// The <see>
+        ///     <cref>Rectangle[]</cref>
+        /// </see>
+        /// .
         /// </returns>
         private Rectangle[] Detect(Bitmap bmp, string haarCascadeFile)
         {
@@ -257,38 +262,17 @@ namespace FaceAPI.Controllers
                 return detectedObject;
             }
         }
-
-        protected virtual bool IsFileLocked(FileInfo file)
-        {
-            FileStream stream = null;
-
-            try
-            {
-                stream = file.Open(FileMode.Open, FileAccess.Read, FileShare.None);
-            }
-            catch (IOException)
-            {
-                //the file is unavailable because it is:
-                //still being written to
-                //or being processed by another thread
-                //or does not exist (has already been processed)
-                return true;
-            }
-            finally
-            {
-                if (stream != null)
-                    stream.Close();
-            }
-
-            //file is not locked
-            return false;
-        }
-
+        
         private void WriteToLog(string message)
         {
+            string name = DateTime.Today.Day + "-" + DateTime.Today.Month + "-" + DateTime.Today.Year + "-log.txt";
+
             try
             {
-                using (StreamWriter file = new StreamWriter(Path.Combine(this.rootPath, "log.txt"), true))
+                var filePath = Path.Combine(
+                    HostingEnvironment.MapPath("~/App_data") ?? throw new InvalidOperationException(), name);
+
+                using (StreamWriter file = new StreamWriter(filePath, true))
                 {
                     file.WriteLine(DateTime.Now.TimeOfDay + "\t" + message);
                     file.Close();
@@ -297,20 +281,6 @@ namespace FaceAPI.Controllers
             catch (Exception e)
             {
                 throw;
-            }
-        }
-
-        private void ClearFolder(string path)
-        {
-            DirectoryInfo folder = new DirectoryInfo(path);
-
-            foreach (FileInfo file in folder.GetFiles())
-            {
-                file.Delete();
-            }
-            foreach (DirectoryInfo dir in folder.GetDirectories())
-            {
-                dir.Delete(true);
             }
         }
     }

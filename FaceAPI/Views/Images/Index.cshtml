@@ -114,7 +114,7 @@
         });
 
         function onSubmitClick() {
-            var image = $('.image-editor').cropit('export',
+            var base64Image = $('.image-editor').cropit('export',
                 {
                     type: 'image/jpeg',
                     quality: 1.0
@@ -123,24 +123,17 @@
             var fileName = $('input[type=file]').val().replace(/C:\\fakepath\\/i, '');
 
             $.post("@Url.Action("UploadImage", "Images")",
-                { image: image, fileName: fileName },
+                { base64Image: base64Image, fileName: fileName },
                 function (jsonData) {
 
-                    var jsonTxt = JSON.stringify(jsonData).replace(/\\/g, "");
+                    var jsonTxt = JSON.stringify(jsonData.properties).replace(/\\/g, "");
 
                     $("#json_data").text(jsonTxt);
+                    $("#img-processed").attr("src", "data:image/jpg;base64," + jsonData.processedImage);
 
-                    getImg(fileName);
+                    console.log(jsonTxt);
+                    console.log(jsonData.processedImage);
                 });
-        }
-
-        function getImg(fileName) {
-            $.get("@Url.Action("GetImage", "Images")",
-            { fileName: fileName },
-            function (base64Data) {
-
-                $("#img-processed").attr("src", "data:image/png;base64," + base64Data.base64image);
-            });
         }
     </script>
 </body>

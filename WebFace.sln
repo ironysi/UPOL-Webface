@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WebFace", "WebFace\WebFace.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FaceAPI", "FaceAPI\FaceAPI.csproj", "{4DEF258A-AAB2-4B8B-95EA-960A8E034E9E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UpolWebFaceAPI", "UpolWebFaceAPI\UpolWebFaceAPI.csproj", "{0C932D39-5CBE-499F-A734-42E304F7E886}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{4DEF258A-AAB2-4B8B-95EA-960A8E034E9E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4DEF258A-AAB2-4B8B-95EA-960A8E034E9E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4DEF258A-AAB2-4B8B-95EA-960A8E034E9E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0C932D39-5CBE-499F-A734-42E304F7E886}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0C932D39-5CBE-499F-A734-42E304F7E886}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0C932D39-5CBE-499F-A734-42E304F7E886}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0C932D39-5CBE-499F-A734-42E304F7E886}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
