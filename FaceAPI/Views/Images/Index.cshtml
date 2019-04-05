@@ -21,6 +21,7 @@
             -ms-background-size: cover;
             background-size: cover;
             border: 1px solid #ccc;
+            -ms-border-radius: 3px;
             border-radius: 3px;
             margin-top: 7px;
             width: 250px;
@@ -32,6 +33,7 @@
             -ms-background-size: cover;
             background-size: cover;
             border: 1px solid #ccc;
+            -ms-border-radius: 3px;
             border-radius: 3px;
             margin-top: 7px;
             width: 250px;
@@ -84,12 +86,13 @@
             clear: both;
             display: table;
         }
+
     </style>
 </head>
 <body>
     <div class="image-editor">
         <form id="login-form">
-            <input type="file" name="image" class="cropit-image-input" />
+            <input type="file" name="image" class="cropit-image-input" id="input-file" />
             <div class="row">
                 <div class="column cropit-preview"></div>
                 <div class="column" id="processed-image"><img id="img-processed" src="" /></div>
@@ -113,27 +116,34 @@
             maxZoom: 2.0
         });
 
+        function getBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+            });
+        }
+
         function onSubmitClick() {
             var base64Image = $('.image-editor').cropit('export',
                 {
-                    type: 'image/jpeg',
-                    quality: 1.0
+                    type: 'image/jpeg'
                 });
-
+            
             var fileName = $('input[type=file]').val().replace(/C:\\fakepath\\/i, '');
 
             $.post("@Url.Action("UploadImage", "Images")",
-                { base64Image: base64Image, fileName: fileName },
+                { base64Image: base64Image, fileName : fileName },
                 function (jsonData) {
 
                     var jsonTxt = JSON.stringify(jsonData.properties).replace(/\\/g, "");
 
                     $("#json_data").text(jsonTxt);
                     $("#img-processed").attr("src", "data:image/jpg;base64," + jsonData.processedImage);
-
-                    console.log(jsonTxt);
-                    console.log(jsonData.processedImage);
                 });
+                
+
         }
     </script>
 </body>

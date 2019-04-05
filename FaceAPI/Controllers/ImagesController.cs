@@ -1,43 +1,34 @@
-﻿using System;
-using System.Drawing;
-using System.Drawing.Imaging;
-using System.IO;
-using System.Linq;
-using System.Web.Hosting;
-using System.Web.Mvc;
-
-using Emgu.CV;
-using Emgu.CV.Structure;
-
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-
-namespace FaceAPI.Controllers
+﻿namespace FaceAPI.Controllers
 {
-    using System.Web.Http;
+    using System;
+    using System.Drawing;
+    using System.Drawing.Imaging;
+    using System.IO;
+    using System.Linq;
+    using System.Web.Hosting;
+    using System.Web.Mvc;
+
+    using Newtonsoft.Json;
+    using Newtonsoft.Json.Linq;
 
     public class ImagesController : Controller
     {
         [JsonProperty]
         private readonly JObject imgProperties = new JObject();
 
-        private readonly string[] allowedFormats = { ".jpg", ".jpeg", ".png", ".gif" };
-
-        private readonly double averageUpperX = (49 / 2.5) / 100;
-        private readonly double averageUpperY = (67 / 3.0) / 100;
-        private readonly double averageLowerX = ((49 + 150) / 2.5) / 100;
-        private readonly double averageLowerY = ((67 + 150) / 3.0) / 100;
-
+        private readonly string[] allowedFormats = { ".jpg", ".jpeg", ".png"};
+         
         public ActionResult Index()
         {
             return View();
         }
 
-
         // POST images/uploadImage 
-        [System.Web.Mvc.HttpPost]
+        [HttpPost]
         public ActionResult UploadImage(string base64Image, string fileName)
         {
+            fileName = fileName.ToLower();  
+
             if (string.IsNullOrEmpty(base64Image) || string.IsNullOrEmpty(base64Image))
             {
                 WriteToLog("UploadImage() - Image is null or empty.");
@@ -53,22 +44,28 @@ namespace FaceAPI.Controllers
 
             Bitmap img = Base64ToBitmap(base64Image);
 
-            var faces = Detect(img, ImageUtils.HaarFace);
-            var eyes = Detect(img, ImageUtils.HaarEye);
+            var faces = ImageUtils.Detect(img, ImageUtils.HaarFace);
+            var eyes = ImageUtils.Detect(img, ImageUtils.HaarEye);
+
 
             if (faces.Length == 1 && eyes.Length == 2)
             {
-                this.imgProperties.Add("imgScore", CalculateScore(faces[0]));
                 GetImgProperties(faces[0], eyes[0], eyes[1]);
+
+                this.imgProperties.Add("positionScore", ImageUtils.PositionalScore(faces[0]));
+                this.imgProperties.Add("brightnessScore", ImageUtils.BrightnessScore(img));
             }
             else if (faces.Length == 1) 
-            {
-                this.imgProperties.Add("imgScore", CalculateScore(faces[0]));
+            { 
                 GetImgProperties(faces, eyes);
+
+                this.imgProperties.Add("positionScore", ImageUtils.PositionalScore(faces[0]));
+                this.imgProperties.Add("brightnessScore", ImageUtils.BrightnessScore(img));
             }
             else
             {
-                this.imgProperties.Add("imgScore", 0.0);
+                this.imgProperties.Add("positionScore", 0.0);
+                this.imgProperties.Add("brightnessScore", ImageUtils.BrightnessScore(img));
                 GetImgProperties(faces, eyes);
             }
 
@@ -88,37 +85,20 @@ namespace FaceAPI.Controllers
 
         private Bitmap Base64ToBitmap(string base64Img)
         {
-            base64Img = base64Img.Replace("data:image/png;base64,", String.Empty);
-            base64Img = base64Img.Replace("data:image/jpeg;base64,", String.Empty);
+            base64Img = base64Img.Replace("data:image/png;base64,", string.Empty);
+            base64Img = base64Img.Replace("data:image/jpeg;base64,", string.Empty);
 
             base64Img = base64Img.Replace('-', '+');
             base64Img = base64Img.Replace('_', '/');
 
-            Byte[] imageBytes = System.Convert.FromBase64String(base64Img);
+            byte[] imageBytes = Convert.FromBase64String(base64Img);
 
-            Image img = (Bitmap)new ImageConverter().ConvertFrom(imageBytes);
+            var img = (Bitmap)new ImageConverter().ConvertFrom(imageBytes);
 
-            var img2 = new Bitmap((Bitmap)img ?? throw new InvalidOperationException(),
+            var img2 = new Bitmap(img ?? throw new InvalidOperationException(),
                 new Size(250, 300));
 
             return img2;
-        }
-
-        private double CalculateScore(Rectangle face)
-        {
-            var upperXDelta = Math.Abs(((face.X / 2.5) / 100) - this.averageUpperX);
-            var upperYDelta = Math.Abs(((face.Y / 3.0) / 100) - this.averageUpperY);
-            var lowerXDelta = Math.Abs((((face.X + face.Width) / 2.5) / 100) - this.averageLowerX);
-            var lowerYDelta = Math.Abs((((face.Y + face.Height) / 3.0) / 100) - this.averageLowerY);
-
-            var k = (1 - Math.Sqrt(upperXDelta));
-            var p = 1 - Math.Sqrt(upperYDelta);
-            var l = (1 - Math.Sqrt(lowerXDelta));
-            var m = (1 - Math.Sqrt(lowerYDelta));
-
-            var output = (1 - Math.Sqrt(upperXDelta)) * (1 - Math.Sqrt(upperYDelta)) * (1 - Math.Sqrt(lowerXDelta))
-                   * (1 - Math.Sqrt(lowerYDelta));
-            return output;
         }
 
         /// <summary>
@@ -128,32 +108,12 @@ namespace FaceAPI.Controllers
         /// <param name="image">
         /// The base64Image.
         /// </param>
-        private void DrawObjects(Bitmap image)
-        {
-            // face detection
-            var faces = Detect(image, ImageUtils.HaarFace);
-
-            Graphics g = Graphics.FromImage(image);
-
-            foreach (var rectangle in faces)
-            {
-                g.DrawRectangle(new Pen(Color.FromArgb(80, 255, 0, 0), (float)3.8), rectangle);
-            }
-
-            g.Save();
-
-            // Eye detection
-            var eyes = Detect(image, ImageUtils.HaarEye);
-
-            Graphics g2 = Graphics.FromImage(image);
-
-            foreach (var rectangle in eyes)
-            {
-                g2.FillRectangle(new SolidBrush(Color.FromArgb(50, 0, 255, 0)), rectangle);
-            }
-            g2.Save();
-        }
-
+        /// <param name="faces">
+        /// The faces.
+        /// </param>
+        /// <param name="eyes">
+        /// The eyes.
+        /// </param>
         private void DrawObjects(Bitmap image, Rectangle[] faces, Rectangle[] eyes)
         {
             // face detection
@@ -231,56 +191,18 @@ namespace FaceAPI.Controllers
             }
 
         }
-
-        /// <summary>
-        /// Detects objects in the base64Image.
-        /// Objects are detected based on 'haar' base64Image that is passed in.
-        /// </summary>
-        /// <param name="bmp">
-        /// Bitmap of base64Image
-        /// </param>
-        /// <param name="haarCascadeFile">
-        /// The haar cascade base64Image. (Pretrained base64Image)
-        /// </param>
-        /// <returns>
-        /// The <see>
-        ///     <cref>Rectangle[]</cref>
-        /// </see>
-        /// .
-        /// </returns>
-        private Rectangle[] Detect(Bitmap bmp, string haarCascadeFile)
-        {
-            Image<Rgb, Byte> x = new Image<Rgb, Byte>(bmp);
-
-            var cascadeClassifier = new CascadeClassifier(haarCascadeFile);
-
-            using (var imageFrame = x)
-            {
-                var grayframe = imageFrame.Convert<Gray, Byte>();
-                var detectedObject = cascadeClassifier.DetectMultiScale(grayframe, 1.1, 10,
-                    Size.Empty); // the actual face detection happens here
-                return detectedObject;
-            }
-        }
         
         private void WriteToLog(string message)
         {
             string name = DateTime.Today.Day + "-" + DateTime.Today.Month + "-" + DateTime.Today.Year + "-log.txt";
 
-            try
-            {
-                var filePath = Path.Combine(
-                    HostingEnvironment.MapPath("~/App_data") ?? throw new InvalidOperationException(), name);
+            var filePath = Path.Combine(
+                HostingEnvironment.MapPath("~/App_data") ?? throw new InvalidOperationException(), name);
 
-                using (StreamWriter file = new StreamWriter(filePath, true))
-                {
-                    file.WriteLine(DateTime.Now.TimeOfDay + "\t" + message);
-                    file.Close();
-                }
-            }
-            catch (Exception e)
+            using (StreamWriter file = new StreamWriter(filePath, true))
             {
-                throw;
+                file.WriteLine(DateTime.Now.TimeOfDay + "\t" + message);
+                file.Close();
             }
         }
     }
